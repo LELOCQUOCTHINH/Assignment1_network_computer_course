@@ -13,30 +13,13 @@ def new_connection(tid, host, port):
 
     def after_login(mode, identifier):
         if mode == "authenticated":
-            print(f"Process {tid} logged in as {identifier}")
-            # Set status to Online after login
-            print(f"Process {tid} sending SET_STATUS {identifier} Online")
+            # Set initial status to Online
             client_socket.sendall(f"SET_STATUS {identifier} Online".encode())
             response = client_socket.recv(1024).decode()
-            print(f"Process {tid} received response for SET_STATUS: {response}")
             if response != "STATUS_UPDATED":
                 print(f"Failed to set initial status for {identifier}")
-
-        # Launch the AfterLoginUI
         AfterLoginUI(mode, identifier, client_socket)
 
-        # Set status to Offline before disconnecting (unless set to Invisible in UI)
-        if mode == "authenticated":
-            # Check the current status by querying the server (optional)
-            # For simplicity, we'll assume the UI might have set it to Invisible
-            print(f"Process {tid} sending SET_STATUS {identifier} Offline")
-            client_socket.sendall(f"SET_STATUS {identifier} Offline".encode())
-            response = client_socket.recv(1024).decode()
-            print(f"Process {tid} received response for SET_STATUS: {response}")
-
-        client_socket.close()
-
-    # Start the UI
     LoginUI(client_socket, after_login)
 
 def connect_server(processnum, host, port):
