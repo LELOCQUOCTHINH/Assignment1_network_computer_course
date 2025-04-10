@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import messagebox, ttk
+from tkinter import Canvas, Scrollbar
 
 class AfterLoginUI:
     def __init__(self, mode, identifier, conn):
@@ -8,45 +9,136 @@ class AfterLoginUI:
         self.conn = conn  # Socket connection to the server
         self.status = "Online" if mode == "authenticated" else "N/A"  # Default status
 
-        self.root = tk.Tk()
-        self.root.title(f"Welcome {self.identifier}")
-        self.root.geometry("400x300")
-        self.root.configure(bg="#f0f0f0")
+        # Colors (Discord-inspired)
+        self.bg_color = "#7289da"  # Main background (purple-blue)
+        self.sidebar_color = "#2f3136"  # Sidebar background (dark gray)
+        self.main_color = "#36393f"  # Main area background (slightly lighter gray)
+        self.text_color = "#dcddde"  # Text color (light gray/white)
+        self.logout_btn_color = "#FF4444"  # Logout button color (red)
 
-        # Status bar frame (top-right corner)
-        self.status_frame = tk.Frame(self.root, bg="#f0f0f0")
-        self.status_frame.pack(side=tk.TOP, anchor="ne", padx=10, pady=5)
+        # Create the main window
+        self.root = tk.Tk()
+        self.root.title(f"Chat App - {self.identifier}")
+        self.root.geometry("800x600")
+        self.root.configure(bg=self.bg_color)
+
+        # Bind the close method to the window close event
+        self.root.protocol("WM_DELETE_WINDOW", self.close)
+
+        # Main frame to hold sidebar and main area
+        self.main_frame = tk.Frame(self.root, bg=self.bg_color)
+        self.main_frame.pack(fill="both", expand=True)
+
+        # Sidebar (left side)
+        self.sidebar_frame = tk.Frame(self.main_frame, bg=self.sidebar_color, width=200)
+        self.sidebar_frame.pack(side="left", fill="y")
+        self.sidebar_frame.pack_propagate(False)  # Prevent sidebar from resizing
+
+        # Section 1: Hosting Channels (minimized height)
+        self.hosting_frame = tk.Frame(self.sidebar_frame, bg=self.sidebar_color, height=150)  # Fixed height
+        self.hosting_frame.pack(fill="x")
+        self.hosting_frame.pack_propagate(False)  # Enforce fixed height
+        self.create_channel_section("Hosting channels", self.hosting_frame)
+
+        # Section 2: Joining Channels (minimized height)
+        self.joining_frame = tk.Frame(self.sidebar_frame, bg=self.sidebar_color, height=150)  # Fixed height
+        self.joining_frame.pack(fill="x")
+        self.joining_frame.pack_propagate(False)  # Enforce fixed height
+        self.create_channel_section("Joining channels", self.joining_frame)
+
+        # Section 3: Other Channels (minimized height)
+        self.other_frame = tk.Frame(self.sidebar_frame, bg=self.sidebar_color, height=150)  # Fixed height
+        self.other_frame.pack(fill="x")
+        self.other_frame.pack_propagate(False)  # Enforce fixed height
+        self.create_channel_section("Other channels", self.other_frame)
+
+        # Section 4: User Bar (larger fixed height to ensure visibility)
+        self.user_bar_section = tk.Frame(self.sidebar_frame, bg=self.sidebar_color, height=150)  # Larger fixed height for user bar
+        self.user_bar_section.pack(side="bottom", fill="x")
+        self.user_bar_section.pack_propagate(False)  # Enforce fixed height
+
+        # User bar inside the user_bar_section
+        self.user_bar_frame = tk.Frame(self.user_bar_section, bg=self.sidebar_color)
+        self.user_bar_frame.pack(fill="x", padx=5, pady=5)
+
+        # User name label
+        self.user_label = tk.Label(self.user_bar_frame, text=self.identifier, font=("Arial", 10), bg=self.sidebar_color, fg=self.text_color)
+        self.user_label.pack(anchor="w", pady=2)
+
+        # Status frame (always visible, no expansion)
+        self.status_frame = tk.Frame(self.user_bar_frame, bg=self.sidebar_color)
+        self.status_frame.pack(fill="x", pady=2)
 
         # Status dot (canvas for circular dot)
-        self.dot_canvas = tk.Canvas(self.status_frame, width=20, height=20, bg="#f0f0f0", highlightthickness=0)
+        self.dot_canvas = tk.Canvas(self.status_frame, width=20, height=20, bg=self.sidebar_color, highlightthickness=0)
         self.dot = self.dot_canvas.create_oval(5, 5, 15, 15, fill=self.get_status_color())
-        self.dot_canvas.pack(side=tk.LEFT)
+        self.dot_canvas.pack(side="left")
 
         # Status label
-        self.status_label = tk.Label(self.status_frame, text=f"Status: {self.status}", font=("Arial", 10), bg="#f0f0f0", fg="#333")
-        self.status_label.pack(side=tk.LEFT, padx=5)
+        self.status_label = tk.Label(self.status_frame, text=f"Status: {self.status}", font=("Arial", 10), bg=self.sidebar_color, fg=self.text_color)
+        self.status_label.pack(side="left", padx=5)
 
         # Status dropdown (for authenticated users only)
         if self.mode == "authenticated":
             self.status_var = tk.StringVar(value=self.status)
             self.status_dropdown = ttk.Combobox(self.status_frame, textvariable=self.status_var, values=["Online", "Invisible"], state="readonly", width=10)
-            self.status_dropdown.pack(side=tk.LEFT, padx=5)
+            self.status_dropdown.pack(side="left", padx=5)
             self.status_dropdown.bind("<<ComboboxSelected>>", self.update_status)
 
-        # Welcome label
-        welcome_text = f"Welcome, {self.identifier}!\nYou are logged in as {self.mode}."
-        self.welcome_label = tk.Label(self.root, text=welcome_text, font=("Arial", 14, "bold"), bg="#f0f0f0", fg="#333")
-        self.welcome_label.pack(pady=20)
+        # Logout button
+        self.logout_btn = tk.Button(self.user_bar_frame, text="LOGOUT", command=self.close, width=10, bg=self.logout_btn_color, fg="white", font=("Arial", 10))
+        self.logout_btn.pack(anchor="w", pady=5)
 
-        # Placeholder for channel manipulation
-        self.info_label = tk.Label(self.root, text="Channel features coming soon!", bg="#f0f0f0", font=("Arial", 10))
-        self.info_label.pack(pady=10)
+        # Main area (right side)
+        self.content_frame = tk.Frame(self.main_frame, bg=self.main_color)
+        self.content_frame.pack(side="right", fill="both", expand=True)
 
-        # Exit button to close the window
-        self.exit_btn = tk.Button(self.root, text="Exit", command=self.close, width=10, bg="#FF4444", fg="white", font=("Arial", 10))
-        self.exit_btn.pack(pady=20)
+        # Welcome message in the main area
+        welcome_text = f"WELCOME, {self.identifier}!\nYou are logged in as {self.mode}."
+        self.welcome_label = tk.Label(self.content_frame, text=welcome_text, font=("Arial", 16, "bold"), bg=self.main_color, fg=self.text_color)
+        self.welcome_label.pack(pady=50)
+
+        # Placeholder for chat area
+        self.chat_placeholder = tk.Label(self.content_frame, text="Chat features coming soon!", font=("Arial", 12), bg=self.main_color, fg=self.text_color)
+        self.chat_placeholder.pack(pady=10)
 
         self.root.mainloop()
+
+    def create_channel_section(self, title, parent_frame):
+        """Create a channel section in the given parent frame with a scrollable list."""
+        # Section frame
+        section_frame = tk.Frame(parent_frame, bg=self.sidebar_color)
+        section_frame.pack(fill="both", expand=True, padx=5, pady=5)
+
+        # Section title
+        title_label = tk.Label(section_frame, text=title, font=("Arial", 12, "bold"), bg=self.sidebar_color, fg=self.text_color)
+        title_label.pack(anchor="w", padx=5)
+
+        # Scrollable frame for channels
+        canvas = Canvas(section_frame, bg=self.sidebar_color, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(section_frame, orient="vertical", command=canvas.yview, style="Vertical.TScrollbar")  # Use ttk.Scrollbar for better styling
+        scrollable_frame = tk.Frame(canvas, bg=self.sidebar_color)
+
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Pack the scrollbar and canvas
+        scrollbar.pack(side="left", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+
+        # Add more channels to ensure overflow and make scrollbar always visible
+        for i in range(10):  # Increased to 10 channels to ensure overflow
+            channel_label = tk.Label(scrollable_frame, text=f"Channel {i+1}", font=("Arial", 10), bg=self.sidebar_color, fg=self.text_color)
+            channel_label.pack(anchor="w", padx=10, pady=2)
+
+        # Customize scrollbar style to match dark theme
+        style = ttk.Style()
+        style.configure("Vertical.TScrollbar", background="#444444", troughcolor="#333333", borderwidth=0)
 
     def get_status_color(self):
         """Return the color for the status dot."""
@@ -63,21 +155,35 @@ class AfterLoginUI:
         """Update the user's status and notify the server."""
         new_status = self.status_var.get()
         if new_status != self.status:
-            self.status = new_status
-            self.status_label.config(text=f"Status: {self.status}")
-            self.dot_canvas.itemconfig(self.dot, fill=self.get_status_color())
-            # Send status update to server
-            self.conn.sendall(f"SET_STATUS {self.identifier} {self.status}".encode())
-            response = self.conn.recv(1024).decode()
-            if response != "STATUS_UPDATED":
-                messagebox.showerror("Error", "Failed to update status on server.")
-                self.status_var.set(self.status)  # Revert on failure
+            try:
+                self.conn.sendall(f"SET_STATUS {self.identifier} {new_status}".encode())
+                response = self.conn.recv(1024).decode()
+                if response != "STATUS_UPDATED":
+                    messagebox.showerror("Error", "Failed to update status on server.")
+                    self.status_var.set(self.status)
+                else:
+                    self.status = new_status
+                    self.status_label.config(text=f"Status: {self.status}")
+                    self.dot_canvas.itemconfig(self.dot, fill=self.get_status_color())
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to communicate with server: {e}")
+                self.status_var.set(self.status)
 
     def close(self):
         """Close the UI and the socket connection."""
         if self.mode == "authenticated":
-            # Set status to Offline before closing
-            self.conn.sendall(f"SET_STATUS {self.identifier} Offline".encode())
-            self.conn.recv(1024)  # Wait for acknowledgment (discard response)
-        self.conn.close()
+            try:
+                # Query the current status
+                self.conn.sendall(f"GET_STATUS {self.identifier}".encode())
+                response = self.conn.recv(1024).decode()
+                if response.startswith("STATUS"):
+                    current_status = response.split()[1]
+                    # Only set status to Offline if not Invisible
+                    if current_status != "Invisible":
+                        self.conn.sendall(f"SET_STATUS {self.identifier} Offline".encode())
+                        self.conn.recv(1024)  # Wait for acknowledgment (discard response)
+            except Exception as e:
+                print(f"Error during logout status update: {e}")
+            finally:
+                self.conn.close()
         self.root.destroy()
