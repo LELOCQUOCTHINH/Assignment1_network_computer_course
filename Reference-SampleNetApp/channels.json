@@ -1,0 +1,1 @@
+{"channels": {"1": {"name": "LLQT", "host": "2", "members": ["2", "1", "v4"]}, "2": {"name": "TTT", "host": "1", "members": ["1", "2", "v4"]}}, "next_id": 3}
