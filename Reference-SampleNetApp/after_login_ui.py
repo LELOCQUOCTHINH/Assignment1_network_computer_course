@@ -15,6 +15,7 @@ class AfterLoginUI:
         self.main_color = "#36393f"  # Main area background (slightly lighter gray)
         self.text_color = "#dcddde"  # Text color (light gray/white)
         self.logout_btn_color = "#FF4444"  # Logout button color (red)
+        self.create_btn_color = "#7289da"  # Create button color (same as main background for consistency)
 
         # Create the main window
         self.root = tk.Tk()
@@ -34,26 +35,26 @@ class AfterLoginUI:
         self.sidebar_frame.pack(side="left", fill="y")
         self.sidebar_frame.pack_propagate(False)  # Prevent sidebar from resizing
 
-        # Section 1: Hosting Channels (minimized height)
-        self.hosting_frame = tk.Frame(self.sidebar_frame, bg=self.sidebar_color, height=150)  # Fixed height
+        # Section 1: Hosting Channels (equal height with other sections)
+        self.hosting_frame = tk.Frame(self.sidebar_frame, bg=self.sidebar_color, height=166)  # Adjusted to 166 for equal distribution
         self.hosting_frame.pack(fill="x")
         self.hosting_frame.pack_propagate(False)  # Enforce fixed height
-        self.create_channel_section("Hosting channels", self.hosting_frame)
+        self.create_channel_section("Hosting channels", self.hosting_frame, is_hosting=True)
 
-        # Section 2: Joining Channels (minimized height)
-        self.joining_frame = tk.Frame(self.sidebar_frame, bg=self.sidebar_color, height=150)  # Fixed height
+        # Section 2: Joining Channels (equal height)
+        self.joining_frame = tk.Frame(self.sidebar_frame, bg=self.sidebar_color, height=166)  # Adjusted to 166
         self.joining_frame.pack(fill="x")
         self.joining_frame.pack_propagate(False)  # Enforce fixed height
         self.create_channel_section("Joining channels", self.joining_frame)
 
-        # Section 3: Other Channels (minimized height)
-        self.other_frame = tk.Frame(self.sidebar_frame, bg=self.sidebar_color, height=150)  # Fixed height
+        # Section 3: Other Channels (equal height)
+        self.other_frame = tk.Frame(self.sidebar_frame, bg=self.sidebar_color, height=166)  # Adjusted to 166
         self.other_frame.pack(fill="x")
         self.other_frame.pack_propagate(False)  # Enforce fixed height
         self.create_channel_section("Other channels", self.other_frame)
 
-        # Section 4: User Bar (larger fixed height to ensure visibility)
-        self.user_bar_section = tk.Frame(self.sidebar_frame, bg=self.sidebar_color, height=150)  # Larger fixed height for user bar
+        # Section 4: User Bar (keep compact to ensure visibility)
+        self.user_bar_section = tk.Frame(self.sidebar_frame, bg=self.sidebar_color, height=100)  # Height remains 100
         self.user_bar_section.pack(side="bottom", fill="x")
         self.user_bar_section.pack_propagate(False)  # Enforce fixed height
 
@@ -65,7 +66,7 @@ class AfterLoginUI:
         self.user_label = tk.Label(self.user_bar_frame, text=self.identifier, font=("Arial", 10), bg=self.sidebar_color, fg=self.text_color)
         self.user_label.pack(anchor="w", pady=2)
 
-        # Status frame (always visible, no expansion)
+        # Status frame
         self.status_frame = tk.Frame(self.user_bar_frame, bg=self.sidebar_color)
         self.status_frame.pack(fill="x", pady=2)
 
@@ -104,11 +105,17 @@ class AfterLoginUI:
 
         self.root.mainloop()
 
-    def create_channel_section(self, title, parent_frame):
-        """Create a channel section in the given parent frame with a scrollable list."""
+    def create_channel_section(self, title, parent_frame, is_hosting=False):
+        """Create a channel section with an optional 'Create a New Channel' button."""
         # Section frame
         section_frame = tk.Frame(parent_frame, bg=self.sidebar_color)
         section_frame.pack(fill="both", expand=True, padx=5, pady=5)
+
+        # Add "Create a New Channel" button before the title for Hosting channels
+        if is_hosting:
+            create_btn = tk.Button(section_frame, text="Create a New Channel", command=self.on_create_channel,
+                                   bg=self.create_btn_color, fg="white", font=("Arial", 10))
+            create_btn.pack(anchor="w", padx=5, pady=2)
 
         # Section title
         title_label = tk.Label(section_frame, text=title, font=("Arial", 12, "bold"), bg=self.sidebar_color, fg=self.text_color)
@@ -116,7 +123,7 @@ class AfterLoginUI:
 
         # Scrollable frame for channels
         canvas = Canvas(section_frame, bg=self.sidebar_color, highlightthickness=0)
-        scrollbar = ttk.Scrollbar(section_frame, orient="vertical", command=canvas.yview, style="Vertical.TScrollbar")  # Use ttk.Scrollbar for better styling
+        scrollbar = ttk.Scrollbar(section_frame, orient="vertical", command=canvas.yview, style="Vertical.TScrollbar")
         scrollable_frame = tk.Frame(canvas, bg=self.sidebar_color)
 
         scrollable_frame.bind(
@@ -131,14 +138,19 @@ class AfterLoginUI:
         scrollbar.pack(side="left", fill="y")
         canvas.pack(side="left", fill="both", expand=True)
 
-        # Add more channels to ensure overflow and make scrollbar always visible
-        for i in range(10):  # Increased to 10 channels to ensure overflow
+        # Add channels (10 channels to test scrollbar, as per previous request)
+        for i in range(10):  # 10 channels to ensure scrollbar visibility
             channel_label = tk.Label(scrollable_frame, text=f"Channel {i+1}", font=("Arial", 10), bg=self.sidebar_color, fg=self.text_color)
             channel_label.pack(anchor="w", padx=10, pady=2)
 
         # Customize scrollbar style to match dark theme
         style = ttk.Style()
         style.configure("Vertical.TScrollbar", background="#444444", troughcolor="#333333", borderwidth=0)
+
+    def on_create_channel(self):
+        """Handle the 'Create a New Channel' button click."""
+        messagebox.showinfo("Info", "Create a New Channel clicked! Functionality to be implemented.")
+        # Future: Add logic to create a channel here
 
     def get_status_color(self):
         """Return the color for the status dot."""
