@@ -47,10 +47,11 @@ class LoginUI:
             if name:
                 response = self.send_command(f"VISITOR {name}")
                 if response.startswith("WELCOME_VISITOR"):
+                    _, _, user_id = response.split()  # Extract user_id from WELCOME_VISITOR name user_id
                     messagebox.showinfo("Success", f"Welcome, {name}!")
                     visitor_window.destroy()
                     self.root.destroy()
-                    self.on_complete("visitor", name)
+                    self.on_complete("visitor", name, user_id)
                 else:
                     messagebox.showerror("Error", response)
             else:
@@ -79,10 +80,11 @@ class LoginUI:
             if username and password:
                 response = self.send_command(f"LOGIN {username} {password}")
                 if response.startswith("LOGIN_SUCCESS"):
+                    user_id = response.split()[1]  # Extract user_id from LOGIN_SUCCESS user_id
                     messagebox.showinfo("Success", "Login successful!")
                     login_window.destroy()
                     self.root.destroy()
-                    self.on_complete("authenticated", username)
+                    self.on_complete("authenticated", username, user_id)
                 else:
                     messagebox.showerror("Error", "Login failed: " + response)
             else:

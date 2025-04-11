@@ -11,16 +11,15 @@ def new_connection(tid, host, port):
     client_socket = socket.socket()
     client_socket.connect((host, port))
 
-    def after_login(mode, identifier):
-        if mode == "authenticated":
-            # Set initial status to Online
-            client_socket.sendall(f"SET_STATUS {identifier} Online".encode())
-            response = client_socket.recv(1024).decode()
-            if response != "STATUS_UPDATED":
-                print(f"Failed to set initial status for {identifier}")
-        AfterLoginUI(mode, identifier, client_socket)
+    def after_login(mode, identifier, user_id):
+        # Launch AfterLoginUI with the provided user_id
+        if user_id:
+            AfterLoginUI(mode, identifier, user_id, client_socket)
+        else:
+            print(f"Failed to obtain user_id for {identifier}. Cannot launch AfterLoginUI.")
 
-    LoginUI(client_socket, after_login)
+    login_ui = LoginUI(client_socket, after_login)
+    login_ui.root.mainloop()
 
 def connect_server(processnum, host, port):
     """Spawn multiple client processes to connect to the server."""
