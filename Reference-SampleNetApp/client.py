@@ -9,17 +9,28 @@ import time
 def new_connection(tid, host, port):
     print(f'Process ID {tid} connecting to {host}:{port}')
     client_socket = socket.socket()
-    client_socket.connect((host, port))
+    try:
+        client_socket.connect((host, port))
 
-    def after_login(mode, identifier, user_id):
-        # Launch AfterLoginUI with the provided user_id
-        if user_id:
-            AfterLoginUI(mode, identifier, user_id, client_socket)
-        else:
-            print(f"Failed to obtain user_id for {identifier}. Cannot launch AfterLoginUI.")
+        def after_login(mode, identifier, user_id):
+            # Launch AfterLoginUI with the provided user_id
+            if user_id:
+                AfterLoginUI(mode, identifier, user_id, client_socket)
+            else:
+                print(f"Failed to obtain user_id for {identifier}. Cannot launch AfterLoginUI.")
 
-    login_ui = LoginUI(client_socket, after_login)
-    login_ui.root.mainloop()
+        login_ui = LoginUI(client_socket, after_login)
+        login_ui.root.mainloop()
+
+    except Exception as e:
+        print(f"Process ID {tid} failed to connect to {host}:{port}: {e}")
+    finally:
+        # Ensure the socket is closed after AfterLoginUI exits
+        try:
+            client_socket.close()
+            print(f"Process ID {tid} closed socket connection to {host}:{port}")
+        except Exception as e:
+            print(f"Process ID {tid} error closing socket: {e}")
 
 def connect_server(processnum, host, port):
     """Spawn multiple client processes to connect to the server."""

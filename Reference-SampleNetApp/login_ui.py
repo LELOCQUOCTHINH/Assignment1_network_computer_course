@@ -1,10 +1,16 @@
 import tkinter as tk
 from tkinter import messagebox
+import socket
+import errno
 
 class LoginUI:
     def __init__(self, conn, on_complete):
         self.conn = conn  # Socket connection to the server
         self.on_complete = on_complete  # Callback to proceed after login
+
+        # Set the socket to non-blocking mode
+        self.conn.setblocking(False)
+
         self.root = tk.Tk()
         self.root.title("Segment Chat Login")
         self.root.geometry("400x300")
@@ -28,8 +34,21 @@ class LoginUI:
 
     def send_command(self, command):
         """Send a command to the server and get response."""
-        self.conn.sendall(command.encode())
-        return self.conn.recv(1024).decode()
+        try:
+            self.conn.sendall(command.encode())
+            # Since the socket is non-blocking, loop until we get the response
+            while True:
+                try:
+                    response = self.conn.recv(1024).decode().strip()
+                    if response:
+                        return response
+                except socket.error as e:
+                    if e.errno != errno.EWOULDBLOCK:
+                        raise e
+                    continue
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to communicate with server: {e}")
+            return ""
 
     def visitor_mode(self):
         """Handle Visitor mode in a new window."""
