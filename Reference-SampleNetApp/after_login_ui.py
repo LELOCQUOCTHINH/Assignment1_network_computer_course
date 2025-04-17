@@ -5,6 +5,7 @@ import threading
 import socket
 from datetime import datetime
 import errno
+import queue
 
 class AfterLoginUI:
     def __init__(self, mode, identifier, user_id, conn):
@@ -24,6 +25,8 @@ class AfterLoginUI:
         self.displayed_messages = set()
         # Set to keep track of channels the user has joined
         self.joined_channels = set()
+        # Queue to handle responses for specific requests (e.g., LEAVE_CHANNEL)
+        self.response_queue = queue.Queue()
 
         print(f"[AfterLoginUI] Initializing UI for user: {self.identifier} (ID: {self.user_id}), mode: {self.mode}, initial status: {self.status}")
 
@@ -34,7 +37,8 @@ class AfterLoginUI:
         self.logout_btn_color = "#FF4444"
         self.create_btn_color = "#7289da"
         self.join_btn_color = "#4CAF50"
-        self.leave_btn_color = "#FF4444"
+        self.leave_btn_color = "#e74c3c"
+        self.leave_btn_hover_color = "#ff5555"
         self.send_btn_color = "#7289da"
 
         self.root = tk.Tk()
@@ -257,25 +261,30 @@ class AfterLoginUI:
                         pass
 
                     elif command[0] == "MESSAGE_SENT":
-                        # Handle the response to SEND_MESSAGE
                         print(f"[AfterLoginUI] Message sent successfully for {self.identifier} (ID: {self.user_id})")
-                        # Use root.after to schedule the UI update on the main thread
                         self.root.after(0, self.message_entry.delete, 0, tk.END)
 
                     elif command[0] in ["VISITOR_NOT_ALLOWED", "CHANNEL_NOT_FOUND", "NOT_A_MEMBER"]:
-                        # Handle error responses for SEND_MESSAGE
                         error_msg = {
                             "VISITOR_NOT_ALLOWED": "Visitors cannot send messages.",
                             "CHANNEL_NOT_FOUND": "The channel no longer exists.",
                             "NOT_A_MEMBER": "You are not a member of this channel."
                         }.get(command[0], f"Failed to send message: {message}")
                         print(f"[AfterLoginUI] Error sending message for {self.identifier} (ID: {self.user_id}): {error_msg}")
-                        # Use root.after to schedule the error message on the main thread
                         self.root.after(0, messagebox.showerror, "Error", error_msg)
+
+                    elif command[0] == "LEAVE_SUCCESS":
+                        # Put the LEAVE_SUCCESS response in the queue for leave_channel to handle
+                        self.response_queue.put(("LEAVE_SUCCESS", message))
+                        print(f"[AfterLoginUI] Queued LEAVE_SUCCESS response for {self.identifier} (ID: {self.user_id})")
+
+                    elif command[0] in ["CHANNEL_NOT_FOUND", "NOT_A_MEMBER"]:
+                        # Handle error responses for LEAVE_CHANNEL
+                        self.response_queue.put(("ERROR", message))
+                        print(f"[AfterLoginUI] Queued error response for LEAVE_CHANNEL: {message}")
 
             except socket.error as e:
                 if e.errno == errno.EWOULDBLOCK:
-                    # No data available, continue the loop to check self.running
                     continue
                 else:
                     print(f"[AfterLoginUI] Socket error in listener for {self.identifier} (ID: {self.user_id}): {e}")
@@ -449,30 +458,46 @@ class AfterLoginUI:
             for visitor in visitors:
                 tk.Label(member_frame, text=visitor, font=("Arial", 10), bg=self.main_color, fg=self.text_color).pack(anchor="w", padx=20, pady=1)
 
+        # Only show the "Leave Channel" button for non-host members (regular members or visitors)
         all_members = channel["regular_members"] + channel["visitors"]
-        if self.user_id in all_members:
-            leave_btn = tk.Button(chat_main_frame, text="Leave Channel", command=lambda: self.leave_channel(channel_id),
-                                  bg=self.leave_btn_color, fg="white", font=("Arial", 10))
-            leave_btn.pack(side="bottom", anchor="se", padx=10, pady=5)
+        is_host = channel["host"] == self.user_id
+        if self.user_id in all_members and not is_host:
+            leave_btn = tk.Button(
+                member_frame,
+                text="LEAVE CHANNEL",
+                command=lambda: self.leave_channel(channel_id),
+                width=15,
+                bg=self.leave_btn_color,
+                fg=self.text_color,
+                font=("Arial", 10),
+                borderwidth=1,
+                highlightthickness=1,
+                highlightbackground=self.sidebar_color,
+                relief="raised",
+                padx=10,
+                pady=5
+            )
+            leave_btn.pack(pady=10)
+
+            # Add hover effects
+            leave_btn.bind("<Enter>", lambda e: leave_btn.config(bg=self.leave_btn_hover_color))
+            leave_btn.bind("<Leave>", lambda e: leave_btn.config(bg=self.leave_btn_color))
         else:
-            tk.Label(chat_left_frame, text="You're not a member of this channel", font=("Arial", 12), bg=self.main_color, fg=self.text_color).pack(pady=10)
-            join_btn = tk.Button(chat_left_frame, text="Join this channel", command=lambda: self.join_channel(channel_id),
-                                 bg=self.join_btn_color, fg="white", font=("Arial", 10))
-            join_btn.pack(pady=5)
+            if not is_host:  # If the user is not a member and not the host, show the "Join" button
+                tk.Label(chat_left_frame, text="You're not a member of this channel", font=("Arial", 12), bg=self.main_color, fg=self.text_color).pack(pady=10)
+                join_btn = tk.Button(chat_left_frame, text="Join this channel", command=lambda: self.join_channel(channel_id),
+                                     bg=self.join_btn_color, fg="white", font=("Arial", 10))
+                join_btn.pack(pady=5)
 
         if self.user_id in all_members:
             self.fetch_messages(channel_id)
 
     def display_message(self, username, timestamp, message):
-        # Create a unique identifier for the message
         message_id = f"{self.selected_channel_id}:{username}:{timestamp}:{message}"
-        # Check if the message has already been displayed
         if message_id in self.displayed_messages:
             print(f"[AfterLoginUI] Skipped duplicate message: {message_id}")
             return
-        # Add the message to the set of displayed messages
         self.displayed_messages.add(message_id)
-        # Display the message
         msg_text = f"{username} ({timestamp}): {message}"
         msg_label = tk.Label(self.message_scrollable_frame, text=msg_text, font=("Arial", 10), bg=self.main_color, fg=self.text_color, anchor="w", wraplength=400, justify="left")
         msg_label.pack(fill="x", padx=5, pady=2)
@@ -484,7 +509,6 @@ class AfterLoginUI:
             try:
                 self.conn.sendall(f"SEND_MESSAGE {self.user_id} {self.selected_channel_id} {message}".encode())
                 print(f"[AfterLoginUI] Sent SEND_MESSAGE request for {self.identifier} (ID: {self.user_id}): {message}")
-                # Response will be handled by listen_for_updates
             except Exception as e:
                 print(f"[AfterLoginUI] Error sending message for {self.identifier} (ID: {self.user_id}): {e}")
                 messagebox.showerror("Error", f"Failed to send message: {e}")
@@ -493,40 +517,72 @@ class AfterLoginUI:
         try:
             self.conn.sendall(f"JOIN_CHANNEL {self.user_id} {channel_id}".encode())
             print(f"[AfterLoginUI] Sent JOIN_CHANNEL request for channel {channel_id}")
-            # Add the channel to the set of joined channels
             self.joined_channels.add(channel_id)
             print(f"[AfterLoginUI] Added channel {channel_id} to joined channels for {self.identifier} (ID: {self.user_id})")
         except Exception as e:
             print(f"[AfterLoginUI] Error joining channel {channel_id} for {self.identifier} (ID: {self.user_id}): {e}")
 
     def leave_channel(self, channel_id):
+        # Check if the user is the host of the channel
+        channel = self.channels.get(channel_id)
+        if not channel:
+            print(f"[AfterLoginUI] Channel {channel_id} not found in self.channels")
+            messagebox.showerror("Error", "Channel not found.")
+            return
+
+        if channel["host"] == self.user_id:
+            error_msg = "You are the host of this channel and cannot leave."
+            print(f"[AfterLoginUI] Error leaving channel {channel_id}: {error_msg}")
+            messagebox.showerror("Error", error_msg)
+            return
+
         try:
+            # Clear the response queue to avoid stale responses
+            while not self.response_queue.empty():
+                self.response_queue.get_nowait()
+
+            # Send the LEAVE_CHANNEL request
             self.conn.sendall(f"LEAVE_CHANNEL {self.user_id} {channel_id}".encode())
             print(f"[AfterLoginUI] Sent LEAVE_CHANNEL request for channel {channel_id}")
-            # Wait for the response since the socket is non-blocking
-            while True:
-                try:
-                    response = self.conn.recv(1024).decode().strip()
-                    if response:
-                        break
-                except socket.error as e:
-                    if e.errno != errno.EWOULDBLOCK:
-                        raise e
-                    continue
+
+            # Wait for the specific response (LEAVE_SUCCESS or error)
+            response_type, response = self.response_queue.get(timeout=5)  # Wait up to 5 seconds
             print(f"[AfterLoginUI] Received response for LEAVE_CHANNEL: {response}")
-            if response == "LEAVE_SUCCESS":
+
+            if response_type == "LEAVE_SUCCESS":
                 messagebox.showinfo("Info", f"You have left channel {self.channels[channel_id]['name']}.")
-                # Remove the channel from the set of joined channels
                 self.joined_channels.discard(channel_id)
                 print(f"[AfterLoginUI] Removed channel {channel_id} from joined channels for {self.identifier} (ID: {self.user_id})")
             else:
-                messagebox.showerror("Error", f"Failed to leave channel: {response}")
+                # Handle error responses (e.g., CHANNEL_NOT_FOUND, NOT_A_MEMBER)
+                error_msg = {
+                    "CHANNEL_NOT_FOUND": "The channel no longer exists.",
+                    "NOT_A_MEMBER": "You are not a member of this channel."
+                }.get(response.split()[0], f"Failed to leave channel: {response}")
+                messagebox.showerror("Error", error_msg)
+                print(f"[AfterLoginUI] Error leaving channel {channel_id}: {error_msg}")
+                return  # Exit early if the operation failed
+
+        except queue.Empty:
+            print(f"[AfterLoginUI] Timeout waiting for LEAVE_CHANNEL response for channel {channel_id}")
+            # Check if the user has actually left the channel by fetching the updated channel list
+            self.fetch_channels()
+            # Verify if the user is still a member
+            channel = self.channels.get(channel_id)
+            if channel and self.user_id not in (channel["regular_members"] + channel["visitors"]):
+                messagebox.showinfo("Info", f"You have left channel {self.channels[channel_id]['name']}.")
+                self.joined_channels.discard(channel_id)
+                print(f"[AfterLoginUI] Removed channel {channel_id} from joined channels for {self.identifier} (ID: {self.user_id})")
+            else:
+                messagebox.showerror("Error", "Failed to leave channel: No response from server.")
+                return
         except Exception as e:
             print(f"[AfterLoginUI] Error leaving channel {channel_id} for {self.identifier} (ID: {self.user_id}): {e}")
             messagebox.showerror("Error", f"Failed to leave channel: {e}")
+            return
 
+        # Update UI after successful leave
         self.selected_channel_id = None
-        # Clear displayed messages when leaving a channel
         self.displayed_messages.clear()
         print(f"[AfterLoginUI] Cleared displayed messages after leaving channel {channel_id}")
         for widget in self.content_frame.winfo_children():
@@ -579,7 +635,6 @@ class AfterLoginUI:
             print(f"[AfterLoginUI] User {self.identifier} (ID: {self.user_id}) attempting to change status from {self.status} to {new_status}")
             try:
                 self.conn.sendall(f"SET_STATUS {self.user_id} {new_status}".encode())
-                # Since the socket is non-blocking, loop until we get the response
                 while True:
                     try:
                         response = self.conn.recv(1024).decode().strip()
@@ -607,13 +662,11 @@ class AfterLoginUI:
         print(f"[AfterLoginUI] Closing UI for user: {self.identifier} (ID: {self.user_id}), mode: {self.mode}")
         self.running = False
 
-        # For visitors, leave all joined channels before shutting down
         if self.mode == "visitor":
-            for channel_id in list(self.joined_channels):  # Create a copy to avoid modifying during iteration
+            for channel_id in list(self.joined_channels):
                 try:
                     self.conn.sendall(f"LEAVE_CHANNEL {self.user_id} {channel_id}".encode())
                     print(f"[AfterLoginUI] Sent LEAVE_CHANNEL request for channel {channel_id} during logout")
-                    # Wait for the response since the socket is non-blocking
                     while True:
                         try:
                             response = self.conn.recv(1024).decode().strip()
@@ -632,12 +685,10 @@ class AfterLoginUI:
                 except Exception as e:
                     print(f"[AfterLoginUI] Error leaving channel {channel_id} during logout for {self.identifier} (ID: {self.user_id}): {e}")
 
-        # Update status to Offline for authenticated users before shutting down the socket
         if self.mode == "authenticated":
             try:
                 self.conn.sendall(f"SET_STATUS {self.user_id} Offline".encode())
                 print(f"[AfterLoginUI] Sent SET_STATUS Offline for {self.identifier} (ID: {self.user_id})")
-                # Wait for the response since the socket is non-blocking
                 while True:
                     try:
                         response = self.conn.recv(1024).decode().strip()
@@ -654,27 +705,23 @@ class AfterLoginUI:
             except Exception as e:
                 print(f"[AfterLoginUI] Error during logout status update for {self.identifier} (ID: {self.user_id}): {e}")
 
-        # Shut down the socket to unblock the listener thread
         try:
             self.conn.shutdown(socket.SHUT_RDWR)
             print(f"[AfterLoginUI] Socket shutdown for {self.identifier} (ID: {self.user_id})")
         except Exception as e:
             print(f"[AfterLoginUI] Error shutting down socket for {self.identifier} (ID: {self.user_id}): {e}")
 
-        # Wait for the listener thread to finish
         try:
             self.listener_thread.join()
             print(f"[AfterLoginUI] Listener thread stopped for {self.identifier} (ID: {self.user_id})")
         except Exception as e:
             print(f"[AfterLoginUI] Error joining listener thread for {self.identifier} (ID: {self.user_id}): {e}")
 
-        # Close the socket
         try:
             self.conn.close()
             print(f"[AfterLoginUI] Socket connection closed for {self.identifier} (ID: {self.user_id})")
         except Exception as e:
             print(f"[AfterLoginUI] Error closing socket for {self.identifier} (ID: {self.user_id}): {e}")
 
-        # Destroy the UI
         self.root.destroy()
         print(f"[AfterLoginUI] UI destroyed for {self.identifier} (ID: {self.user_id})")
