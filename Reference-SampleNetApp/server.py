@@ -85,6 +85,7 @@ messages = message_db["messages"]
 
 connected_clients = []
 visitor_ids = {}
+visitor_statuses = {}  # New dictionary to track visitor statuses
 
 def get_user_id_by_username(username, is_visitor=False):
     if is_visitor:
@@ -106,6 +107,14 @@ def get_username_by_user_id(user_id):
 def is_visitor(user_id):
     return user_id in visitor_ids.values()
 
+def get_status(user_id):
+    username = get_username_by_user_id(user_id)
+    if username in users:
+        return users[username]["status"]
+    elif user_id in visitor_statuses:
+        return visitor_statuses[user_id]
+    return "Offline"
+
 def broadcast(message, exclude_conn=None):
     print(f"[Server] Broadcasting message: {message}")
     for client_conn, _, client_username, _ in connected_clients:
@@ -121,7 +130,6 @@ def broadcast_to_channel(channel_id, message, exclude_conn=None):
     members = channels[channel_id]["members"]
     print(f"[Server] Broadcasting to channel {channel_id} (members: {members}): {message}")
     for client_conn, _, client_username, client_user_id in connected_clients:
-        # Only exclude if exclude_conn is specified and matches
         if exclude_conn and client_conn == exclude_conn:
             continue
         if client_user_id in members:
@@ -130,23 +138,33 @@ def broadcast_to_channel(channel_id, message, exclude_conn=None):
             except:
                 print(f"[Server] Failed to send message to {client_username} in channel {channel_id}")
 
-def handle_visitor(data):
+def handle_visitor(data, conn):
     global next_user_id
     name = data.split()[1]
     visitor_ids[name] = f"v{next_user_id}"
+    user_id = visitor_ids[name]
+    visitor_statuses[user_id] = "Online"  # Set visitor status to Online
     next_user_id += 1
     user_db["next_user_id"] = next_user_id
     save_users()
-    print(f"[Server] Registered visitor {name} with ID {visitor_ids[name]}")
-    return f"WELCOME_VISITOR {name} {visitor_ids[name]}"
+    print(f"[Server] Registered visitor {name} with ID {user_id}")
+    # Broadcast the visitor's status to other clients
+    broadcast(f"STATUS {user_id} Online", exclude_conn=conn)
+    return f"WELCOME_VISITOR {name} {user_id}"
 
-def handle_login(data):
+def handle_login(data, conn):
     _, username, password = data.split()
     if username in users and users[username]["password"] == password:
-        users[username]["status"] = "Online"
+        user_id = users[username]["user_id"]
+        current_status = users[username]["status"]
+        if current_status != "Invisible":
+            users[username]["status"] = "Online"
+            broadcast(f"STATUS {user_id} Online", exclude_conn=conn)
+        else:
+            print(f"[Server] Retaining Invisible status for {username} (ID: {user_id}) on login")
         save_users()
-        print(f"[Server] Login successful for {username} (ID: {users[username]['user_id']})")
-        return f"LOGIN_SUCCESS {users[username]['user_id']}"
+        print(f"[Server] Login successful for {username} (ID: {user_id}), status: {users[username]['status']}")
+        return f"LOGIN_SUCCESS {user_id}"
     print(f"[Server] Login failed for {username}")
     return "LOGIN_FAILED"
 
@@ -177,20 +195,44 @@ def handle_get_username(data):
     print(f"[Server] Username request for user_id {user_id}: not found")
     return f"USERNAME_NOT_FOUND {user_id}"
 
-def handle_set_status(data, addr):
+def handle_get_status(data):
+    _, user_id = data.split()
+    status = get_status(user_id)
+    print(f"[Server] Status request for user_id {user_id}: {status}")
+    return f"STATUS {user_id} {status}"
+
+def handle_set_status(data, addr, conn):
     _, user_id, status = data.split()
     username = get_username_by_user_id(user_id)
-    if username and username in users:
-        if status in ["Online", "Offline", "Invisible"]:
-            users[username]["status"] = status
-            save_users()
-            print(f"[Server] Set status of {username} (ID: {user_id}) to {status}")
-            return "STATUS_UPDATED"
-        else:
-            print(f"[Server] Invalid status {status} for user ID {user_id}")
-            return "INVALID_STATUS"
-    print(f"[Server] User ID {user_id} not found for status update")
-    return "USER_NOT_FOUND"
+    if is_visitor(user_id):
+        # Handle visitor status
+        if user_id in visitor_statuses:
+            if status in ["Online", "Offline", "Invisible"]:
+                visitor_statuses[user_id] = status
+                print(f"[Server] Set status of visitor {username} (ID: {user_id}) to {status}")
+                # Broadcast the status change to other clients
+                broadcast(f"STATUS {user_id} {status}", exclude_conn=conn)
+                return "STATUS_UPDATED"
+            else:
+                print(f"[Server] Invalid status {status} for visitor ID {user_id}")
+                return "INVALID_STATUS"
+        print(f"[Server] Visitor ID {user_id} not found for status update")
+        return "USER_NOT_FOUND"
+    else:
+        # Handle authenticated user status
+        if username and username in users:
+            if status in ["Online", "Offline", "Invisible"]:
+                users[username]["status"] = status
+                save_users()
+                print(f"[Server] Set status of {username} (ID: {user_id}) to {status}")
+                # Broadcast the status change to other clients
+                broadcast(f"STATUS {user_id} {status}", exclude_conn=conn)
+                return "STATUS_UPDATED"
+            else:
+                print(f"[Server] Invalid status {status} for user ID {user_id}")
+                return "INVALID_STATUS"
+        print(f"[Server] User ID {user_id} not found for status update")
+        return "USER_NOT_FOUND"
 
 def handle_get_peers(data, addr):
     peers = peer_manager.get_peers()
@@ -329,15 +371,17 @@ def handle_get_messages(data):
 def process_command(data, addr, conn):
     print(f"[Server] Processing command from {addr}: {data}")
     if data.startswith("VISITOR"):
-        return handle_visitor(data)
+        return handle_visitor(data, conn)
     elif data.startswith("LOGIN"):
-        return handle_login(data)
+        return handle_login(data, conn)
     elif data.startswith("REGISTER"):
         return handle_register(data)
     elif data.startswith("GET_USERNAME"):
         return handle_get_username(data)
+    elif data.startswith("GET_STATUS"):
+        return handle_get_status(data)
     elif data.startswith("SET_STATUS"):
-        return handle_set_status(data, addr)
+        return handle_set_status(data, addr, conn)
     elif data.startswith("GET_PEERS"):
         return handle_get_peers(data, addr)
     elif data.startswith("CREATE_CHANNEL"):
@@ -388,10 +432,6 @@ def handle_client_messages(conn, addr, username=None, user_id=None):
             if not is_visitor(user_id):
                 # Handle authenticated user
                 if username in users:
-                    if users[username]["status"] != "Invisible":
-                        users[username]["status"] = "Offline"
-                        save_users()
-                        print(f"[Server] Set status of {username} (ID: {user_id}) to Offline")
                     if "client_addr" in users[username]:
                         del users[username]["client_addr"]
                         save_users()
@@ -411,7 +451,7 @@ def handle_client_messages(conn, addr, username=None, user_id=None):
                     print(f"[Server] Updated channels.json after removing visitor {username} (ID: {user_id})")
                 else:
                     print(f"[Server] No channels updated for visitor {username} (ID: {user_id}) - they were not in any channels")
-                # Remove the visitor from visitor_ids
+                # Remove the visitor from visitor_ids and visitor_statuses
                 visitor_name = None
                 for name, vid in list(visitor_ids.items()):
                     if vid == user_id:
@@ -422,6 +462,10 @@ def handle_client_messages(conn, addr, username=None, user_id=None):
                     print(f"[Server] Removed visitor {visitor_name} (ID: {user_id}) from visitor_ids")
                 else:
                     print(f"[Server] Visitor ID {user_id} not found in visitor_ids during cleanup")
+                if user_id in visitor_statuses:
+                    del visitor_statuses[user_id]
+                    print(f"[Server] Removed visitor {username} (ID: {user_id}) from visitor_statuses")
+                    broadcast(f"STATUS {user_id} Offline", exclude_conn=conn)
         if (conn, addr, username, user_id) in connected_clients:
             connected_clients.remove((conn, addr, username, user_id))
             print(f"[Server] Removed {username} (ID: {user_id}) from connected clients")
