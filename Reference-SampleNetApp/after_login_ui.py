@@ -7,31 +7,32 @@ from datetime import datetime
 import errno
 import queue
 import time
+import cv2
+import numpy as np
+from PIL import Image, ImageTk
+from p2p_stream import P2PStream
 
 class AfterLoginUI:
-    def __init__(self, mode, identifier, user_id, conn):
+    def __init__(self, mode, identifier, user_id, conn, channel_id=None):
         self.mode = mode
         self.identifier = identifier
         self.user_id = user_id
         self.conn = conn
-        # Initialize status as None; we'll fetch it for authenticated users
+        self.channel_id = channel_id
         self.status = "N/A" if mode == "visitor" else None
 
-        # Set the socket to non-blocking mode
         self.conn.setblocking(False)
 
         self.channels = {}
-        self.selected_channel_id = None
+        self.selected_channel_id = str(channel_id) if channel_id is not None else None  # Ensure string
         self.user_id_to_username = {user_id: identifier}
-        self.user_id_to_status = {user_id: self.status}  # Initialize with current user's status
+        self.user_id_to_status = {user_id: self.status}
         self.displayed_messages = set()
         self.joined_channels = set()
         self.response_queue = queue.Queue()
-        # Add a queue for status update responses
         self.status_response_queue = queue.Queue()
-        # Debounce mechanism for status updates
         self.last_status_change = 0
-        self.status_debounce_delay = 0.5  # 500ms debounce delay
+        self.status_debounce_delay = 0.5
 
         print(f"[AfterLoginUI] Initializing UI for user: {self.identifier} (ID: {self.user_id}), mode: {self.mode}, initial status: {self.status}")
 
@@ -99,15 +100,13 @@ class AfterLoginUI:
         self.status_label.pack(side="left", padx=5)
 
         if self.mode == "authenticated":
-            # Fetch the user's status from the server
-            self.status = self.fetch_own_status() or "Online"  # Fallback to "Online" if fetch fails
+            self.status = self.fetch_own_status() or "Online"
             self.user_id_to_status[self.user_id] = self.status
             print(f"[AfterLoginUI] Set initial status for {self.identifier} (ID: {self.user_id}) to {self.status}")
             self.status_var = tk.StringVar(value=self.status)
             self.status_dropdown = ttk.Combobox(self.status_frame, textvariable=self.status_var, values=["Online", "Invisible"], state="readonly", width=10)
             self.status_dropdown.pack(side="left", padx=5)
             self.status_dropdown.bind("<<ComboboxSelected>>", self.on_status_selected)
-            # Update status label and dot after fetching
             self.status_label.config(text=f"Status: {self.status}")
             new_color = self.get_status_color(self.status)
             if new_color:
@@ -127,11 +126,22 @@ class AfterLoginUI:
         self.chat_placeholder = tk.Label(self.content_frame, text="Chat features coming soon!", font=("Arial", 12), bg=self.main_color, fg=self.text_color)
         self.chat_placeholder.pack(pady=10)
 
+        self.stream = P2PStream(
+            user_id=self.user_id,
+            channel_id=self.channel_id,
+            conn=self.conn,
+            on_frame=self.on_frame,
+            on_stream_ended=self.on_stream_ended
+        )
+
+        self.video_labels = {}
+        self.video_frames = {}
+        self.own_stream_label = None
+
         self.running = True
         self.listener_thread = threading.Thread(target=self.listen_for_updates)
         self.listener_thread.start()
 
-        # Start a thread to process status update responses
         self.status_response_thread = threading.Thread(target=self.process_status_responses)
         self.status_response_thread.start()
 
@@ -140,13 +150,11 @@ class AfterLoginUI:
         self.root.mainloop()
 
     def fetch_own_status(self):
-        """Fetch the user's own status from the server synchronously."""
         try:
             self.conn.sendall(f"GET_STATUS {self.user_id}".encode())
             print(f"[AfterLoginUI] Sent GET_STATUS request for own user_id {self.user_id}")
-            # Wait briefly for the response
             start_time = time.time()
-            timeout = 2.0  # 2-second timeout
+            timeout = 2.0
             while time.time() - start_time < timeout:
                 try:
                     response = self.conn.recv(1024).decode().strip()
@@ -159,7 +167,7 @@ class AfterLoginUI:
                     if e.errno != errno.EWOULDBLOCK:
                         print(f"[AfterLoginUI] Socket error fetching own status for {self.identifier} (ID: {self.user_id}): {e}")
                         return None
-                    time.sleep(0.01)  # Short sleep to prevent CPU hogging
+                    time.sleep(0.01)
             print(f"[AfterLoginUI] Timeout fetching own status for {self.identifier} (ID: {self.user_id})")
             return None
         except Exception as e:
@@ -247,9 +255,9 @@ class AfterLoginUI:
         elif status == "Offline":
             return "black"
         elif status == "Invisible":
-            return None  # No dot for Invisible
+            return None
         else:
-            return "black"  # Default to black for unknown statuses
+            return "black"
 
     def listen_for_updates(self):
         while self.running:
@@ -263,7 +271,9 @@ class AfterLoginUI:
                 for message in messages:
                     if not message:
                         continue
-                    command = message.split(maxsplit=3)
+                    # Split the message without limiting the number of splits
+                    command = message.split()
+                    print(f"[AfterLoginUI] Parsed command: {command}, length: {len(command)}")
 
                     if command[0] == "NO_CHANNELS":
                         self.channels = {}
@@ -303,7 +313,7 @@ class AfterLoginUI:
                                 if member_id not in self.user_id_to_status:
                                     self.fetch_status(member_id)
                             self.update_channel_lists()
-                            if self.selected_channel_id == channel_id:
+                            if str(self.selected_channel_id) == str(channel_id):
                                 print(f"[AfterLoginUI] Channel {channel_id} is currently selected, refreshing UI")
                                 self.select_channel(channel_id)
                         except (ValueError, IndexError) as e:
@@ -378,18 +388,68 @@ class AfterLoginUI:
                             self.user_id_to_status[user_id] = status
                             print(f"[AfterLoginUI] Updated status for user_id {user_id}: {status}")
                             if self.selected_channel_id:
-                                channel = self.channels.get(self.selected_channel_id)
+                                channel = self.channels.get(int(self.selected_channel_id))
                                 if channel:
                                     all_members = [channel["host"]] + channel["regular_members"] + channel["visitors"]
                                     if user_id in all_members:
-                                        self.select_channel(self.selected_channel_id)
+                                        self.select_channel(int(self.selected_channel_id))
                         except (ValueError, IndexError) as e:
                             print(f"[AfterLoginUI] Error parsing STATUS message: {message}, error: {e}")
 
                     elif command[0] == "STATUS_UPDATED" or command[0] == "INVALID_STATUS" or command[0] == "USER_NOT_FOUND":
-                        # Queue the status update response to be processed by the status response thread
                         self.status_response_queue.put((command[0], message))
                         print(f"[AfterLoginUI] Queued status response: {message}")
+
+                    elif command[0] == "LIVESTREAM_START" and len(command) == 5:
+                        try:
+                            streamer_id, channel_id, ip, port = command[1], command[2], command[3], command[4]
+                            print(f"[AfterLoginUI] Processing LIVESTREAM_START for {self.identifier} (ID: {self.user_id}): streamer_id={streamer_id}, channel_id={channel_id}, selected_channel_id={self.selected_channel_id}")
+                            if channel_id == str(self.selected_channel_id) and streamer_id != self.user_id:
+                                print(f"[AfterLoginUI] Conditions met for starting to receive stream: channel_id={channel_id}, selected_channel_id={self.selected_channel_id}, streamer_id={streamer_id}, self.user_id={self.user_id}")
+                                label = tk.Label(self.stream_frame, text=f"{self.get_username(streamer_id)}'s Stream", font=("Arial", 10), bg=self.main_color, fg=self.text_color)
+                                label.pack()
+                                video_label = tk.Label(self.stream_frame)
+                                video_label.pack()
+                                self.video_labels[streamer_id] = video_label
+                                self.stream.channel_id = channel_id
+                                print(f"[AfterLoginUI] Calling start_receiving for streamer_id={streamer_id}, ip={ip}, port={port}")
+                                try:
+                                    self.stream.start_receiving(streamer_id, ip, port)
+                                    print(f"[AfterLoginUI] Started receiving stream from {streamer_id} in channel {channel_id}")
+                                except Exception as e:
+                                    print(f"[AfterLoginUI] Exception in start_receiving for streamer_id={streamer_id}: {e}")
+                            else:
+                                print(f"[AfterLoginUI] Skipped LIVESTREAM_START for {self.identifier} (ID: {self.user_id}): channel_id={channel_id}, selected_channel_id={self.selected_channel_id}, streamer_id={streamer_id}, self.user_id={self.user_id}")
+                        except Exception as e:
+                            print(f"[AfterLoginUI] Error handling LIVESTREAM_START: {message}, error: {e}")
+
+                    elif command[0] == "LIVESTREAM_STOP" and len(command) == 3:
+                        try:
+                            streamer_id, channel_id = command[1], command[2]
+                            print(f"[AfterLoginUI] Processing LIVESTREAM_STOP for streamer_id={streamer_id}, channel_id={channel_id}, selected_channel_id={self.selected_channel_id}")
+                            if channel_id == str(self.selected_channel_id) and streamer_id != self.user_id:
+                                print(f"[AfterLoginUI] Stopped receiving stream from {streamer_id} in channel {channel_id}")
+                                self.stream.stop_receiving(streamer_id)
+                            else:
+                                print(f"[AfterLoginUI] Skipped LIVESTREAM_STOP: channel_id={channel_id}, selected_channel_id={self.selected_channel_id}, streamer_id={streamer_id}, self.user_id={self.user_id}")
+                        except Exception as e:
+                            print(f"[AfterLoginUI] Error handling LIVESTREAM_STOP: message={message}, error={str(e)}")
+
+                    elif command[0] == "STREAM_STARTED":
+                        print(f"[AfterLoginUI] Stream started confirmation received for {self.identifier} (ID: {self.user_id})")
+                        self.root.after(0, lambda: self.start_stream_button.config(state="disabled"))
+                        self.root.after(0, lambda: self.stop_stream_button.config(state="normal"))
+                        label = tk.Label(self.stream_frame, text="Your Stream", font=("Arial", 10), bg=self.main_color, fg=self.text_color)
+                        label.pack()
+                        self.own_stream_label = tk.Label(self.stream_frame)
+                        self.own_stream_label.pack()
+                        self.video_labels[self.user_id] = self.own_stream_label
+
+                    elif command[0] == "STREAM_STOPPED":
+                        print(f"[AfterLoginUI] Stream stopped confirmation received for {self.identifier} (ID: {self.user_id})")
+                        self.root.after(0, lambda: self.start_stream_button.config(state="normal"))
+                        self.root.after(0, lambda: self.stop_stream_button.config(state="disabled"))
+                        self.on_stream_ended(self.user_id)
 
             except socket.error as e:
                 if e.errno == errno.EWOULDBLOCK:
@@ -404,7 +464,6 @@ class AfterLoginUI:
         print(f"[AfterLoginUI] Listener thread exiting for {self.identifier} (ID: {self.user_id})")
 
     def process_status_responses(self):
-        """Process status update responses asynchronously."""
         while self.running:
             try:
                 response_type, response = self.status_response_queue.get(timeout=1)
@@ -415,19 +474,16 @@ class AfterLoginUI:
                 print(f"[AfterLoginUI] Error processing status response for {self.identifier} (ID: {self.user_id}): {e}")
 
     def handle_status_response(self, response_type, response):
-        """Handle the status update response in the main GUI thread."""
         if response_type == "STATUS_UPDATED":
             new_status = self.status_var.get()
             self.status = new_status
             self.user_id_to_status[self.user_id] = new_status
             self.status_label.config(text=f"Status: {self.status}")
-            # Update the dot's color
             new_color = self.get_status_color(new_status)
             if new_color:
                 self.dot_canvas.itemconfig(self.dot, fill=new_color)
                 self.dot_canvas.itemconfig(self.dot, outline=new_color)
             else:
-                # For Invisible, hide the dot by setting fill and outline to transparent
                 self.dot_canvas.itemconfig(self.dot, fill="", outline="")
             print(f"[AfterLoginUI] Status updated successfully for {self.identifier} (ID: {self.user_id}): {self.status}, dot color: {new_color}")
         else:
@@ -524,7 +580,8 @@ class AfterLoginUI:
         self.root.update()
 
     def select_channel(self, channel_id):
-        self.selected_channel_id = channel_id
+        self.selected_channel_id = str(channel_id)  # Ensure string
+        self.stream.channel_id = str(channel_id)
         channel = self.channels.get(channel_id)
         if not channel:
             print(f"[AfterLoginUI] Channel {channel_id} not found in self.channels")
@@ -575,6 +632,15 @@ class AfterLoginUI:
         if self.mode == "visitor":
             self.message_entry.config(state="disabled")
             send_btn.config(state="disabled")
+
+        if self.mode == "authenticated":
+            self.start_stream_button = tk.Button(chat_left_frame, text="Start Streaming", command=self.start_streaming, bg=self.create_btn_color, fg="white", font=("Arial", 10))
+            self.start_stream_button.pack(pady=5)
+            self.stop_stream_button = tk.Button(chat_left_frame, text="Stop Streaming", command=self.stop_streaming, bg=self.leave_btn_color, fg="white", font=("Arial", 10), state="disabled")
+            self.stop_stream_button.pack(pady=5)
+
+        self.stream_frame = tk.Frame(chat_left_frame, bg=self.main_color)
+        self.stream_frame.pack(fill="both", expand=True)
 
         member_frame = tk.Frame(chat_main_frame, bg=self.main_color, width=150)
         member_frame.pack(side="right", fill="y")
@@ -692,171 +758,174 @@ class AfterLoginUI:
 
         if channel["host"] == self.user_id:
             error_msg = "You are the host of this channel and cannot leave."
-            print(f"[AfterLoginUI] Error leaving channel {channel_id}: {error_msg}")
+            print(f"[AfterLoginUI] {self.identifier} (ID: {self.user_id}) attempted to leave channel {channel_id} but is the host")
             messagebox.showerror("Error", error_msg)
             return
 
         try:
-            while not self.response_queue.empty():
-                self.response_queue.get_nowait()
-
             self.conn.sendall(f"LEAVE_CHANNEL {self.user_id} {channel_id}".encode())
             print(f"[AfterLoginUI] Sent LEAVE_CHANNEL request for channel {channel_id}")
+            self.joined_channels.discard(channel_id)
+            print(f"[AfterLoginUI] Removed channel {channel_id} from joined channels for {self.identifier} (ID: {self.user_id})")
 
-            response_type, response = self.response_queue.get(timeout=5)
-            print(f"[AfterLoginUI] Received response for LEAVE_CHANNEL: {response}")
+            for streamer_id in list(self.video_labels.keys()):
+                self.stream.stop_receiving(streamer_id)
+                self.on_stream_ended(streamer_id)
 
-            if response_type == "LEAVE_SUCCESS":
-                messagebox.showinfo("Info", f"You have left channel {self.channels[channel_id]['name']}.")
-                self.joined_channels.discard(channel_id)
-                print(f"[AfterLoginUI] Removed channel {channel_id} from joined channels for {self.identifier} (ID: {self.user_id})")
+            start_time = time.time()
+            timeout = 5.0
+            while time.time() - start_time < timeout:
+                try:
+                    response_type, response = self.response_queue.get_nowait()
+                    if response_type == "LEAVE_SUCCESS":
+                        print(f"[AfterLoginUI] Successfully left channel {channel_id}")
+                        self.selected_channel_id = None
+                        self.fetch_channels()
+                        for widget in self.content_frame.winfo_children():
+                            widget.destroy()
+                        tk.Label(self.content_frame, text="You have left the channel.", font=("Arial", 12), bg=self.main_color, fg=self.text_color).pack(pady=10)
+                        break
+                    elif response_type == "ERROR":
+                        command = response.split()
+                        error_msg = {
+                            "CHANNEL_NOT_FOUND": "The channel no longer exists.",
+                            "NOT_A_MEMBER": "You are not a member of this channel."
+                        }.get(command[0], f"Failed to leave channel: {response}")
+                        print(f"[AfterLoginUI] Error leaving channel {channel_id}: {error_msg}")
+                        messagebox.showerror("Error", error_msg)
+                        break
+                except queue.Empty:
+                    time.sleep(0.1)
+                    continue
             else:
-                error_msg = {
-                    "CHANNEL_NOT_FOUND": "The channel no longer exists.",
-                    "NOT_A_MEMBER": "You are not a member of this channel."
-                }.get(response.split()[0], f"Failed to leave channel: {response}")
-                messagebox.showerror("Error", error_msg)
-                print(f"[AfterLoginUI] Error leaving channel {channel_id}: {error_msg}")
-                return
+                print(f"[AfterLoginUI] Timeout waiting for LEAVE_CHANNEL response for channel {channel_id}")
+                messagebox.showerror("Error", "No response from server while leaving the channel.")
 
-        except queue.Empty:
-            print(f"[AfterLoginUI] Timeout waiting for LEAVE_CHANNEL response for channel {channel_id}")
-            self.fetch_channels()
-            channel = self.channels.get(channel_id)
-            if channel and self.user_id not in (channel["regular_members"] + channel["visitors"]):
-                messagebox.showinfo("Info", f"You have left channel {self.channels[channel_id]['name']}.")
-                self.joined_channels.discard(channel_id)
-                print(f"[AfterLoginUI] Removed channel {channel_id} from joined channels for {self.identifier} (ID: {self.user_id})")
-            else:
-                messagebox.showerror("Error", "Failed to leave channel: No response from server.")
-                return
         except Exception as e:
             print(f"[AfterLoginUI] Error leaving channel {channel_id} for {self.identifier} (ID: {self.user_id}): {e}")
             messagebox.showerror("Error", f"Failed to leave channel: {e}")
-            return
-
-        self.selected_channel_id = None
-        self.displayed_messages.clear()
-        print(f"[AfterLoginUI] Cleared displayed messages after leaving channel {channel_id}")
-        for widget in self.content_frame.winfo_children():
-            widget.destroy()
-        self.welcome_label = tk.Label(self.content_frame, text=f"WELCOME, {self.identifier}!\nYou are logged in as {self.mode}.", font=("Arial", 16, "bold"), bg=self.main_color, fg=self.text_color)
-        self.welcome_label.pack(pady=50)
-        self.chat_placeholder = tk.Label(self.content_frame, text="Chat features coming soon!", font=("Arial", 12), bg=self.main_color, fg=self.text_color)
-        self.chat_placeholder.pack(pady=10)
-        self.fetch_channels()
 
     def on_create_channel(self):
-        print(f"[AfterLoginUI] 'Create a New Channel' button clicked by user: {self.identifier} (ID: {self.user_id})")
+        if self.mode != "authenticated":
+            messagebox.showerror("Error", "Only authenticated users can create channels.")
+            print(f"[AfterLoginUI] {self.identifier} (ID: {self.user_id}) attempted to create a channel but is in {self.mode} mode")
+            return
 
-        create_window = tk.Toplevel(self.root)
-        create_window.title("Create a New Channel")
-        create_window.geometry("300x150")
-        create_window.configure(bg=self.main_color)
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Create a New Channel")
+        dialog.geometry("300x150")
+        dialog.configure(bg=self.main_color)
+        dialog.transient(self.root)
+        dialog.grab_set()
 
-        tk.Label(create_window, text="Enter channel name:", bg=self.main_color, fg=self.text_color, font=("Arial", 12)).pack(pady=10)
-        channel_name_entry = tk.Entry(create_window, width=25)
+        tk.Label(dialog, text="Channel Name:", font=("Arial", 10), bg=self.main_color, fg=self.text_color).pack(pady=10)
+        channel_name_entry = tk.Entry(dialog, font=("Arial", 10), bg="#2f3136", fg=self.text_color)
         channel_name_entry.pack(pady=5)
 
-        def submit_channel():
+        def submit():
             channel_name = channel_name_entry.get().strip()
-            if channel_name:
-                try:
-                    self.conn.sendall(f"CREATE_CHANNEL {self.user_id} {channel_name}".encode())
-                    create_window.destroy()
-                except Exception as e:
-                    print(f"[AfterLoginUI] Error creating channel for {self.identifier} (ID: {self.user_id}): {e}")
-                    messagebox.showerror("Error", f"Failed to create channel: {e}")
-            else:
-                messagebox.showwarning("Warning", "Please enter a channel name.")
+            if not channel_name:
+                messagebox.showerror("Error", "Channel name cannot be empty.")
+                print(f"[AfterLoginUI] Channel creation failed: empty channel name")
+                return
+            try:
+                self.conn.sendall(f"CREATE_CHANNEL {self.user_id} {channel_name}".encode())
+                print(f"[AfterLoginUI] Sent CREATE_CHANNEL request for {self.identifier} (ID: {self.user_id}): {channel_name}")
+                dialog.destroy()
+            except Exception as e:
+                print(f"[AfterLoginUI] Error creating channel for {self.identifier} (ID: {self.user_id}): {e}")
+                messagebox.showerror("Error", f"Failed to create channel: {e}")
+                dialog.destroy()
 
-        tk.Button(create_window, text="OK", command=submit_channel, bg=self.create_btn_color, fg="white").pack(pady=10)
+        tk.Button(dialog, text="Create", command=submit, bg=self.create_btn_color, fg="white", font=("Arial", 10)).pack(pady=10)
 
     def on_status_selected(self, event=None):
-        """Handle status selection with debouncing."""
         new_status = self.status_var.get()
         current_time = time.time()
-        if new_status != self.status:
-            # Debounce: Ignore status changes that occur too quickly
-            if current_time - self.last_status_change < self.status_debounce_delay:
-                print(f"[AfterLoginUI] Debounced status change for {self.identifier} (ID: {self.user_id}): {new_status}")
-                self.status_var.set(self.status)  # Revert to current status
-                return
+        if current_time - self.last_status_change < self.status_debounce_delay:
+            print(f"[AfterLoginUI] Status change debounced for {self.identifier} (ID: {self.user_id})")
+            self.status_var.set(self.status)
+            return
+
+        if new_status == self.status:
+            print(f"[AfterLoginUI] Status unchanged for {self.identifier} (ID: {self.user_id}): {new_status}")
+            return
+
+        try:
+            self.conn.sendall(f"SET_STATUS {self.user_id} {new_status}".encode())
+            print(f"[AfterLoginUI] Sent SET_STATUS request for {self.identifier} (ID: {self.user_id}): {new_status}")
             self.last_status_change = current_time
-            print(f"[AfterLoginUI] User {self.identifier} (ID: {self.user_id}) attempting to change status from {self.status} to {new_status}")
-            try:
-                self.conn.sendall(f"SET_STATUS {self.user_id} {new_status}".encode())
-                print(f"[AfterLoginUI] Sent SET_STATUS {new_status} for {self.identifier} (ID: {self.user_id})")
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to communicate with server: {e}")
-                self.status_var.set(self.status)
-                print(f"[AfterLoginUI] Status update error for {self.identifier} (ID: {self.user_id}): {e}")
+        except Exception as e:
+            print(f"[AfterLoginUI] Error setting status for {self.identifier} (ID: {self.user_id}): {e}")
+            messagebox.showerror("Error", f"Failed to update status: {e}")
+            self.status_var.set(self.status)
+
+    def start_streaming(self):
+        if not self.selected_channel_id:
+            messagebox.showerror("Error", "Please select a channel to start streaming.")
+            print(f"[AfterLoginUI] Streaming failed: no channel selected for {self.identifier} (ID: {self.user_id})")
+            return
+        try:
+            self.stream.start()
+            print(f"[AfterLoginUI] Started streaming for {self.identifier} (ID: {self.user_id}) in channel {self.selected_channel_id}")
+        except Exception as e:
+            print(f"[AfterLoginUI] Error starting stream for {self.identifier} (ID: {self.user_id}): {e}")
+            messagebox.showerror("Error", f"Failed to start stream: {e}")
+
+    def stop_streaming(self):
+        try:
+            self.stream.stop()
+            print(f"[AfterLoginUI] Stopped streaming for {self.identifier} (ID: {self.user_id}) in channel {self.selected_channel_id}")
+        except Exception as e:
+            print(f"[AfterLoginUI] Error stopping stream for {self.identifier} (ID: {self.user_id}): {e}")
+            messagebox.showerror("Error", f"Failed to stop stream: {e}")
+
+    def on_frame(self, streamer_id, frame):
+        try:
+            print(f"[AfterLoginUI] Received frame from {streamer_id}, shape: {frame.shape}")
+            if streamer_id not in self.video_labels:
+                print(f"[AfterLoginUI] No video label for {streamer_id}, stream may have ended")
+                return
+
+            # Convert the frame to a format Tkinter can display
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)  # Ensure correct color format
+            image = Image.fromarray(frame_rgb)
+            image = image.resize((320, 240), Image.Resampling.LANCZOS)
+            photo = ImageTk.PhotoImage(image)
+
+            # Update the video label
+            video_label = self.video_labels[streamer_id]
+            video_label.configure(image=photo)
+            video_label.image = photo  # Keep a reference to avoid garbage collection
+            video_label.update()  # Force Tkinter to update the display
+            print(f"[AfterLoginUI] Updated video display for {streamer_id}, label visible: {video_label.winfo_exists()}")
+        except Exception as e:
+            print(f"[AfterLoginUI] Error displaying frame from {streamer_id}: {e}")
+
+    def on_stream_ended(self, streamer_id):
+        print(f"[AfterLoginUI] on_stream_ended called for streamer {streamer_id}, current video_labels: {list(self.video_labels.keys())}")
+        if streamer_id in self.video_labels:
+            self.video_labels[streamer_id].destroy()
+            del self.video_labels[streamer_id]
+            print(f"[AfterLoginUI] Stream ended for {streamer_id}, removed video display")
+        else:
+            print(f"[AfterLoginUI] Stream ended for {streamer_id}, but no video label found")
 
     def close(self):
-        print(f"[AfterLoginUI] Closing UI for user: {self.identifier} (ID: {self.user_id}), mode: {self.mode}")
         self.running = False
-
-        if self.mode == "visitor":
-            for channel_id in list(self.joined_channels):
-                try:
-                    self.conn.sendall(f"LEAVE_CHANNEL {self.user_id} {channel_id}".encode())
-                    print(f"[AfterLoginUI] Sent LEAVE_CHANNEL request for channel {channel_id} during logout")
-                    while True:
-                        try:
-                            response = self.conn.recv(1024).decode().strip()
-                            if response:
-                                break
-                        except socket.error as e:
-                            if e.errno != errno.EWOULDBLOCK:
-                                raise e
-                            continue
-                    print(f"[AfterLoginUI] Received response for LEAVE_CHANNEL during logout: {response}")
-                    if response == "LEAVE_SUCCESS":
-                        self.joined_channels.discard(channel_id)
-                        print(f"[AfterLoginUI] Successfully left channel {channel_id} during logout for {self.identifier} (ID: {self.user_id})")
-                    else:
-                        print(f"[AfterLoginUI] Failed to leave channel {channel_id} during logout: {response}")
-                except Exception as e:
-                    print(f"[AfterLoginUI] Error leaving channel {channel_id} during logout for {self.identifier} (ID: {self.user_id}): {e}")
-
-        if self.mode == "authenticated" and self.status != "Invisible":
+        self.stream.close()
+        print(f"[AfterLoginUI] Closing UI for {self.identifier} (ID: {self.user_id})")
+        if self.mode == "authenticated":
             try:
-                self.conn.sendall(f"SET_STATUS {self.user_id} Offline".encode())
-                print(f"[AfterLoginUI] Sent SET_STATUS Offline for {self.identifier} (ID: {self.user_id})")
-                while True:
-                    try:
-                        response = self.conn.recv(1024).decode().strip()
-                        if response:
-                            break
-                    except socket.error as e:
-                        if e.errno != errno.EWOULDBLOCK:
-                            raise e
-                        continue
-                if response == "STATUS_UPDATED":
-                    print(f"[AfterLoginUI] Set status to Offline for {self.identifier} (ID: {self.user_id})")
-                else:
-                    print(f"[AfterLoginUI] Failed to set status to Offline for {self.identifier} (ID: {self.user_id}): {response}")
+                if self.status != "Invisible":
+                    self.conn.sendall(f"SET_STATUS {self.user_id} Offline".encode())
+                    print(f"[AfterLoginUI] Sent SET_STATUS Offline for {self.identifier} (ID: {self.user_id}) on logout")
             except Exception as e:
-                print(f"[AfterLoginUI] Error during logout status update for {self.identifier} (ID: {self.user_id}): {e}")
-
-        try:
-            self.conn.shutdown(socket.SHUT_RDWR)
-            print(f"[AfterLoginUI] Socket shutdown for {self.identifier} (ID: {self.user_id})")
-        except Exception as e:
-            print(f"[AfterLoginUI] Error shutting down socket for {self.identifier} (ID: {self.user_id}): {e}")
-
-        try:
-            self.listener_thread.join()
-            self.status_response_thread.join()
-            print(f"[AfterLoginUI] Threads stopped for {self.identifier} (ID: {self.user_id})")
-        except Exception as e:
-            print(f"[AfterLoginUI] Error joining threads for {self.identifier} (ID: {self.user_id}): {e}")
-
+                print(f"[AfterLoginUI] Error setting status to Offline on logout for {self.identifier} (ID: {self.user_id}): {e}")
         try:
             self.conn.close()
-            print(f"[AfterLoginUI] Socket connection closed for {self.identifier} (ID: {self.user_id})")
+            print(f"[AfterLoginUI] Closed connection for {self.identifier} (ID: {self.user_id})")
         except Exception as e:
-            print(f"[AfterLoginUI] Error closing socket for {self.identifier} (ID: {self.user_id}): {e}")
-
+            print(f"[AfterLoginUI] Error closing connection for {self.identifier} (ID: {self.user_id}): {e}")
         self.root.destroy()
         print(f"[AfterLoginUI] UI destroyed for {self.identifier} (ID: {self.user_id})")

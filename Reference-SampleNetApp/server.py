@@ -86,6 +86,7 @@ messages = message_db["messages"]
 connected_clients = []
 visitor_ids = {}
 visitor_statuses = {}  # New dictionary to track visitor statuses
+livestreamers = {}  # {channel_id: (user_id, ip, port)} to track active livestreamers
 
 def get_user_id_by_username(username, is_visitor=False):
     if is_visitor:
@@ -282,6 +283,10 @@ def handle_join_channel(data):
             save_channels()
             broadcast(f"UPDATE_CHANNELS {channel_id} {channels[channel_id]['name']} {channels[channel_id]['host']}")
             print(f"[Server] User ID {user_id} joined channel {channel_id}")
+            # Notify the client if there's an active livestream in this channel
+            if channel_id in livestreamers:
+                streamer_id, ip, port = livestreamers[channel_id]
+                return f"JOIN_SUCCESS\nLIVESTREAM_START {streamer_id} {channel_id} {ip} {port}"
             return "JOIN_SUCCESS"
         else:
             print(f"[Server] User ID {user_id} is already a member of channel {channel_id}")
@@ -368,6 +373,32 @@ def handle_get_messages(data):
     print(f"[Server] Retrieved messages for channel {channel_id}: {len(response)} messages")
     return "\n".join(response)
 
+def handle_start_stream(data, conn):
+    _, user_id, channel_id, ip, port = data.split()
+    if channel_id not in channels:
+        print(f"[Server] Channel {channel_id} not found for START_STREAM by user ID {user_id}")
+        return "CHANNEL_NOT_FOUND"
+    if user_id not in channels[channel_id]["members"]:
+        print(f"[Server] User ID {user_id} is not a member of channel {channel_id}")
+        return "NOT_A_MEMBER"
+    livestreamers[channel_id] = (user_id, ip, port)
+    broadcast_to_channel(channel_id, f"LIVESTREAM_START {user_id} {channel_id} {ip} {port}", exclude_conn=conn)
+    print(f"[Server] User {user_id} started streaming in channel {channel_id} at {ip}:{port}")
+    return "STREAM_STARTED"
+
+def handle_stop_stream(data, conn):
+    _, user_id, channel_id = data.split()
+    if channel_id not in channels:
+        print(f"[Server] Channel {channel_id} not found for STOP_STREAM by user ID {user_id}")
+        return "CHANNEL_NOT_FOUND"
+    if channel_id in livestreamers and livestreamers[channel_id][0] == user_id:
+        del livestreamers[channel_id]
+        broadcast_to_channel(channel_id, f"LIVESTREAM_STOP {user_id} {channel_id}", exclude_conn=conn)
+        print(f"[Server] User {user_id} stopped streaming in channel {channel_id}")
+        return "STREAM_STOPPED"
+    print(f"[Server] No active stream found for user {user_id} in channel {channel_id}")
+    return "NO_STREAM"
+
 def process_command(data, addr, conn):
     print(f"[Server] Processing command from {addr}: {data}")
     if data.startswith("VISITOR"):
@@ -396,6 +427,10 @@ def process_command(data, addr, conn):
         return handle_send_message(data, conn)
     elif data.startswith("GET_MESSAGES"):
         return handle_get_messages(data)
+    elif data.startswith("START_STREAM"):
+        return handle_start_stream(data, conn)
+    elif data.startswith("STOP_STREAM"):
+        return handle_stop_stream(data, conn)
     else:
         print(f"[Server] Invalid command from {addr}: {data}")
         return "INVALID_COMMAND"
@@ -466,6 +501,12 @@ def handle_client_messages(conn, addr, username=None, user_id=None):
                     del visitor_statuses[user_id]
                     print(f"[Server] Removed visitor {username} (ID: {user_id}) from visitor_statuses")
                     broadcast(f"STATUS {user_id} Offline", exclude_conn=conn)
+            # Stop any active streams by this user
+            for channel_id in list(livestreamers.keys()):
+                if livestreamers[channel_id][0] == user_id:
+                    del livestreamers[channel_id]
+                    broadcast_to_channel(channel_id, f"LIVESTREAM_STOP {user_id} {channel_id}")
+                    print(f"[Server] Stopped stream for user {user_id} in channel {channel_id} due to disconnect")
         if (conn, addr, username, user_id) in connected_clients:
             connected_clients.remove((conn, addr, username, user_id))
             print(f"[Server] Removed {username} (ID: {user_id}) from connected clients")

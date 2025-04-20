@@ -1,0 +1,265 @@
+import socket
+import threading
+import logging
+import cv2
+import numpy as np
+import struct
+import time
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+class P2PStream:
+    def __init__(self, user_id, channel_id, conn, on_frame=None, on_stream_ended=None):
+        self.user_id = user_id
+        self.channel_id = channel_id
+        self.conn = conn
+        self.on_frame = on_frame
+        self.on_stream_ended = on_stream_ended
+        self.running = False
+        self.streaming = False
+        self.server_socket = None
+        self.clients = []
+        self.clients_lock = threading.Lock()  # Initialize the lock
+        self.stream_port = None
+        self.active_streams = {}
+        self.last_frame = None
+
+    def get_local_ip(self):
+        """Dynamically determine the local IP address."""
+        try:
+            # Create a dummy socket to determine the local IP
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.settimeout(0)
+            # Connect to a remote address (doesn't need to be reachable)
+            s.connect(('8.8.8.8', 1))
+            local_ip = s.getsockname()[0]
+            s.close()
+            logging.info(f"[P2PStream] Determined local IP: {local_ip}")
+            return local_ip
+        except Exception as e:
+            logging.error(f"[P2PStream] Error determining local IP: {e}")
+            return "127.0.0.1"  # Fallback to localhost
+
+    def start(self, host=None):
+        if self.streaming:
+            logging.warning("[P2PStream] Already streaming")
+            return
+        self.streaming = True
+        self.running = True
+        try:
+            # Use dynamically determined host IP if not provided
+            if host is None:
+                host = self.get_local_ip()
+            self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.server_socket.bind((host, 0))
+            self.server_socket.listen(5)
+            self.stream_port = self.server_socket.getsockname()[1]
+            logging.info(f"[P2PStream] Streaming server started on {host}:{self.stream_port}")
+            # Verify the socket is listening
+            socket_info = self.server_socket.getsockname()
+            logging.info(f"[P2PStream] Server socket is listening at {socket_info}")
+
+            msg = f"START_STREAM {self.user_id} {self.channel_id} {host} {self.stream_port}"
+            self.conn.sendall(msg.encode())
+            logging.info(f"[P2PStream] Sent START_STREAM for user {self.user_id}")
+
+            threading.Thread(target=self.accept_viewers, daemon=True).start()
+            threading.Thread(target=self.stream_video, daemon=True).start()
+        except Exception as e:
+            logging.error(f"[P2PStream] Error starting stream: {e}")
+            self.stop()
+
+    def stream_video(self):
+        cap = None
+        try:
+            cap = cv2.VideoCapture(0)
+            if not cap.isOpened():
+                logging.error("[P2PStream] Failed to open webcam")
+                return
+
+            ret, frame = cap.read()
+            if not ret:
+                logging.error("[P2PStream] Initial frame capture failed. Camera may be in use or inaccessible.")
+                return
+
+            logging.info("[P2PStream] Successfully started capturing video")
+            time.sleep(1.0)  # Add a 1-second delay to give the viewer time to set up
+
+            while self.streaming:
+                ret, frame = cap.read()
+                if not ret:
+                    logging.error("[P2PStream] Failed to capture frame")
+                    time.sleep(0.1)
+                    continue
+
+                frame = cv2.resize(frame, (320, 240))
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+                self.last_frame = frame.copy()
+                if self.on_frame:
+                    self.on_frame(self.user_id, self.last_frame)
+
+                encoded, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+                if not encoded:
+                    logging.error("[P2PStream] Failed to encode frame")
+                    continue
+
+                frame_data = buffer.tobytes()
+                frame_size = len(frame_data)
+
+                with self.clients_lock:
+                    clients_to_remove = []
+                    for client in self.clients[:]:
+                        try:
+                            client.sendall(struct.pack('!I', frame_size))
+                            client.sendall(frame_data)
+                            logging.debug(f"[P2PStream] Sent frame of size {frame_size} to client")
+                        except Exception as e:
+                            logging.error(f"[P2PStream] Error sending frame to client: {e}")
+                            clients_to_remove.append(client)
+                            client.close()
+
+                    for client in clients_to_remove:
+                        if client in self.clients:
+                            self.clients.remove(client)
+
+                time.sleep(0.033)
+
+        except Exception as e:
+            logging.error(f"[P2PStream] Error in stream_video: {e}")
+        finally:
+            if cap and cap.isOpened():
+                cap.release()
+            self.stop()
+
+    def accept_viewers(self):
+        while self.running and self.streaming:
+            try:
+                self.server_socket.settimeout(1.0)
+                logging.debug(f"[P2PStream] Waiting for viewer connections on {self.server_socket.getsockname()}")
+                client, addr = self.server_socket.accept()
+                logging.info(f"[P2PStream] Viewer connected: {addr}")
+                self.clients.append(client)
+            except socket.timeout:
+                continue
+            except Exception as e:
+                if self.running and self.streaming:
+                    logging.error(f"[P2PStream] Error accepting viewer: {e}")
+                break
+        logging.info("[P2PStream] Stopped accepting viewers")
+
+    def stop(self):
+        if not self.streaming:
+            return
+        self.streaming = False
+        self.running = False
+        for client in self.clients:
+            try:
+                client.close()
+            except Exception as e:
+                logging.error(f"[P2PStream] Error closing client: {e}")
+        self.clients.clear()
+        if self.server_socket:
+            self.server_socket.close()
+            self.server_socket = None
+        msg = f"STOP_STREAM {self.user_id} {self.channel_id}"
+        self.conn.sendall(msg.encode())
+        logging.info(f"[P2PStream] Stopped streaming for user {self.user_id}")
+
+    def start_receiving(self, streamer_id, ip, port):
+        if streamer_id in self.active_streams:
+            logging.warning(f"[P2PStream] Already receiving stream from {streamer_id}")
+            return
+        client_socket = None
+        try:
+            client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            client_socket.settimeout(5.0)
+            time.sleep(1.0)  # Increased delay to ensure the streamer's server is ready
+            logging.info(f"[P2PStream] Attempting to connect to {ip}:{port} for streamer {streamer_id}")
+            client_socket.connect((ip, int(port)))
+            logging.info(f"[P2PStream] Connected to streamer {streamer_id} at {ip}:{port}")
+
+            receive_thread = threading.Thread(target=self.receive_stream, args=(streamer_id, client_socket))
+            receive_thread.start()
+            self.active_streams[streamer_id] = (client_socket, receive_thread)
+        except socket.timeout as e:
+            logging.error(f"[P2PStream] Timeout connecting to streamer {streamer_id} at {ip}:{port}: {e}")
+            if client_socket:
+                client_socket.close()
+        except socket.error as e:
+            logging.error(f"[P2PStream] Socket error connecting to streamer {streamer_id} at {ip}:{port}: {e}")
+            if client_socket:
+                client_socket.close()
+        except Exception as e:
+            logging.error(f"[P2PStream] Unexpected error connecting to streamer {streamer_id}: {e}")
+            if client_socket:
+                client_socket.close()
+        finally:
+            if streamer_id not in self.active_streams:
+                logging.info(f"[P2PStream] Failed to start receiving stream from {streamer_id} at {ip}:{port}")
+
+    def stop_receiving(self, streamer_id):
+        logging.info(f"[P2PStream] Stopping receiving stream from {streamer_id}")
+        if streamer_id in self.active_streams:
+            client_socket, receive_thread = self.active_streams[streamer_id]
+            try:
+                client_socket.close()
+            except Exception as e:
+                logging.error(f"[P2PStream] Error closing client socket for {streamer_id}: {e}")
+            del self.active_streams[streamer_id]
+            receive_thread.join()  # Wait for the receive thread to finish
+            logging.info(f"[P2PStream] Stopped receiving stream from {streamer_id}")
+        else:
+            logging.warning(f"[P2PStream] No active stream found for {streamer_id}")
+
+    def receive_stream(self, streamer_id, client_socket):
+        logging.info(f"[P2PStream] Started receive_stream thread for streamer {streamer_id}")
+        try:
+            while streamer_id in self.active_streams:
+                logging.debug(f"[P2PStream] Waiting to receive frame size from {streamer_id}")
+                size_data = client_socket.recv(4)
+                if len(size_data) != 4:
+                    logging.error(f"[P2PStream] Incomplete frame size received from {streamer_id}: {len(size_data)} bytes")
+                    break
+                frame_size = struct.unpack('!I', size_data)[0]
+                logging.debug(f"[P2PStream] Received frame size {frame_size} from {streamer_id}")
+
+                frame_data = b""
+                remaining = frame_size
+                while remaining > 0:
+                    chunk = client_socket.recv(min(remaining, 4096))
+                    if not chunk:
+                        logging.error(f"[P2PStream] Connection closed while receiving frame from {streamer_id}")
+                        break
+                    frame_data += chunk
+                    remaining -= len(chunk)
+                if len(frame_data) != frame_size:
+                    logging.error(f"[P2PStream] Incomplete frame data received from {streamer_id}: {len(frame_data)}/{frame_size} bytes")
+                    break
+
+                frame_array = np.frombuffer(frame_data, dtype=np.uint8)
+                frame = cv2.imdecode(frame_array, cv2.IMREAD_COLOR)
+                if frame is None:
+                    logging.error(f"[P2PStream] Failed to decode frame from {streamer_id}")
+                    continue
+
+                logging.debug(f"[P2PStream] Successfully decoded frame from {streamer_id}, shape: {frame.shape}")
+                if self.on_frame:
+                    self.on_frame(streamer_id, frame)
+
+        except Exception as e:
+            logging.error(f"[P2PStream] Error receiving stream from {streamer_id}: {e}")
+        finally:
+            logging.info(f"[P2PStream] Cleaning up receive_stream for streamer {streamer_id}")
+            client_socket.close()
+            if streamer_id in self.active_streams:
+                del self.active_streams[streamer_id]
+                if self.on_stream_ended:
+                    logging.info(f"[P2PStream] Calling on_stream_ended for streamer {streamer_id}")
+                    self.on_stream_ended(streamer_id)
+
+    def close(self):
+        self.stop()
+        for streamer_id in list(self.active_streams.keys()):
+            self.stop_receiving(streamer_id)
