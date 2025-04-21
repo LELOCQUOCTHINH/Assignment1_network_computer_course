@@ -5,6 +5,7 @@ import cv2
 import numpy as np
 import struct
 import time
+import threading
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -19,18 +20,18 @@ class P2PStream:
         self.streaming = False
         self.server_socket = None
         self.clients = []
-        self.clients_lock = threading.Lock()  # Initialize the lock
+        self.clients_lock = threading.Lock()
         self.stream_port = None
         self.active_streams = {}
         self.last_frame = None
+        self.stream_thread = None
+        self.accept_thread = None
+        self.cap = None  # Track VideoCapture explicitly
 
     def get_local_ip(self):
-        """Dynamically determine the local IP address."""
         try:
-            # Create a dummy socket to determine the local IP
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             s.settimeout(0)
-            # Connect to a remote address (doesn't need to be reachable)
             s.connect(('8.8.8.8', 1))
             local_ip = s.getsockname()[0]
             s.close()
@@ -38,7 +39,7 @@ class P2PStream:
             return local_ip
         except Exception as e:
             logging.error(f"[P2PStream] Error determining local IP: {e}")
-            return "127.0.0.1"  # Fallback to localhost
+            return "127.0.0.1"
 
     def start(self, host=None):
         if self.streaming:
@@ -47,7 +48,6 @@ class P2PStream:
         self.streaming = True
         self.running = True
         try:
-            # Use dynamically determined host IP if not provided
             if host is None:
                 host = self.get_local_ip()
             self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -56,38 +56,37 @@ class P2PStream:
             self.server_socket.listen(5)
             self.stream_port = self.server_socket.getsockname()[1]
             logging.info(f"[P2PStream] Streaming server started on {host}:{self.stream_port}")
-            # Verify the socket is listening
-            socket_info = self.server_socket.getsockname()
-            logging.info(f"[P2PStream] Server socket is listening at {socket_info}")
+            logging.info(f"[P2PStream] Server socket is listening at {self.server_socket.getsockname()}")
 
             msg = f"START_STREAM {self.user_id} {self.channel_id} {host} {self.stream_port}"
             self.conn.sendall(msg.encode())
             logging.info(f"[P2PStream] Sent START_STREAM for user {self.user_id}")
 
-            threading.Thread(target=self.accept_viewers, daemon=True).start()
-            threading.Thread(target=self.stream_video, daemon=True).start()
+            self.stream_thread = threading.Thread(target=self.stream_video, daemon=True)
+            self.accept_thread = threading.Thread(target=self.accept_viewers, daemon=True)
+            self.stream_thread.start()
+            self.accept_thread.start()
         except Exception as e:
             logging.error(f"[P2PStream] Error starting stream: {e}")
             self.stop()
 
     def stream_video(self):
-        cap = None
         try:
-            cap = cv2.VideoCapture(0)
-            if not cap.isOpened():
+            self.cap = cv2.VideoCapture(0)
+            if not self.cap.isOpened():
                 logging.error("[P2PStream] Failed to open webcam")
                 return
 
-            ret, frame = cap.read()
+            ret, frame = self.cap.read()
             if not ret:
                 logging.error("[P2PStream] Initial frame capture failed. Camera may be in use or inaccessible.")
                 return
 
             logging.info("[P2PStream] Successfully started capturing video")
-            time.sleep(1.0)  # Add a 1-second delay to give the viewer time to set up
+            time.sleep(1.0)
 
             while self.streaming:
-                ret, frame = cap.read()
+                ret, frame = self.cap.read()
                 if not ret:
                     logging.error("[P2PStream] Failed to capture frame")
                     time.sleep(0.1)
@@ -129,8 +128,13 @@ class P2PStream:
         except Exception as e:
             logging.error(f"[P2PStream] Error in stream_video: {e}")
         finally:
-            if cap and cap.isOpened():
-                cap.release()
+            if self.cap:
+                try:
+                    self.cap.release()
+                    logging.info("[P2PStream] Released VideoCapture resource")
+                except Exception as e:
+                    logging.error(f"[P2PStream] Error releasing VideoCapture: {e}")
+                self.cap = None
             self.stop()
 
     def accept_viewers(self):
@@ -140,7 +144,8 @@ class P2PStream:
                 logging.debug(f"[P2PStream] Waiting for viewer connections on {self.server_socket.getsockname()}")
                 client, addr = self.server_socket.accept()
                 logging.info(f"[P2PStream] Viewer connected: {addr}")
-                self.clients.append(client)
+                with self.clients_lock:
+                    self.clients.append(client)
             except socket.timeout:
                 continue
             except Exception as e:
@@ -154,17 +159,53 @@ class P2PStream:
             return
         self.streaming = False
         self.running = False
-        for client in self.clients:
-            try:
-                client.close()
-            except Exception as e:
-                logging.error(f"[P2PStream] Error closing client: {e}")
-        self.clients.clear()
+
+        # Close all client sockets
+        with self.clients_lock:
+            for client in self.clients:
+                try:
+                    client.close()
+                except Exception as e:
+                    logging.error(f"[P2PStream] Error closing client socket: {e}")
+            self.clients.clear()
+
+        # Close the server socket
         if self.server_socket:
-            self.server_socket.close()
+            try:
+                self.server_socket.close()
+            except Exception as e:
+                logging.error(f"[P2PStream] Error closing server socket: {e}")
             self.server_socket = None
-        msg = f"STOP_STREAM {self.user_id} {self.channel_id}"
-        self.conn.sendall(msg.encode())
+
+        # Send STOP_STREAM message
+        try:
+            msg = f"STOP_STREAM {self.user_id} {self.channel_id}"
+            self.conn.sendall(msg.encode())
+            logging.info(f"[P2PStream] Sent STOP_STREAM for user {self.user_id}")
+        except Exception as e:
+            logging.error(f"[P2PStream] Error sending STOP_STREAM: {e}")
+
+        # Wait for threads to terminate
+        if self.stream_thread and self.stream_thread.is_alive():
+            self.stream_thread.join(timeout=1.0)
+            logging.info("[P2PStream] Stream thread terminated")
+        if self.accept_thread and self.accept_thread.is_alive():
+            self.accept_thread.join(timeout=1.0)
+            logging.info("[P2PStream] Accept thread terminated")
+
+        # Ensure VideoCapture is released
+        if self.cap:
+            try:
+                self.cap.release()
+                logging.info("[P2PStream] Released VideoCapture resource in stop")
+            except Exception as e:
+                logging.error(f"[P2PStream] Error releasing VideoCapture in stop: {e}")
+            self.cap = None
+
+        # Log active threads for diagnostics
+        active_threads = threading.enumerate()
+        logging.info(f"[P2PStream] Active threads after stop: {[t.name for t in active_threads]}")
+
         logging.info(f"[P2PStream] Stopped streaming for user {self.user_id}")
 
     def start_receiving(self, streamer_id, ip, port):
@@ -175,12 +216,12 @@ class P2PStream:
         try:
             client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             client_socket.settimeout(5.0)
-            time.sleep(1.0)  # Increased delay to ensure the streamer's server is ready
+            time.sleep(1.0)
             logging.info(f"[P2PStream] Attempting to connect to {ip}:{port} for streamer {streamer_id}")
             client_socket.connect((ip, int(port)))
             logging.info(f"[P2PStream] Connected to streamer {streamer_id} at {ip}:{port}")
 
-            receive_thread = threading.Thread(target=self.receive_stream, args=(streamer_id, client_socket))
+            receive_thread = threading.Thread(target=self.receive_stream, args=(streamer_id, client_socket), daemon=True)
             receive_thread.start()
             self.active_streams[streamer_id] = (client_socket, receive_thread)
         except socket.timeout as e:
@@ -188,7 +229,7 @@ class P2PStream:
             if client_socket:
                 client_socket.close()
         except socket.error as e:
-            logging.error(f"[P2PStream] Socket error connecting to streamer {streamer_id} at {ip}:{port}: {e}")
+            logging.error(f"[P2PStream] Socket error connecting to streamer {ip}:{port}: {e}")
             if client_socket:
                 client_socket.close()
         except Exception as e:
@@ -208,7 +249,9 @@ class P2PStream:
             except Exception as e:
                 logging.error(f"[P2PStream] Error closing client socket for {streamer_id}: {e}")
             del self.active_streams[streamer_id]
-            receive_thread.join()  # Wait for the receive thread to finish
+            if receive_thread.is_alive():
+                receive_thread.join(timeout=1.0)
+                logging.info(f"[P2PStream] Receive thread for {streamer_id} terminated")
             logging.info(f"[P2PStream] Stopped receiving stream from {streamer_id}")
         else:
             logging.warning(f"[P2PStream] No active stream found for {streamer_id}")
@@ -260,6 +303,10 @@ class P2PStream:
                     self.on_stream_ended(streamer_id)
 
     def close(self):
+        logging.info(f"[P2PStream] Closing P2PStream for user {self.user_id}")
         self.stop()
         for streamer_id in list(self.active_streams.keys()):
             self.stop_receiving(streamer_id)
+        # Log active threads for diagnostics
+        active_threads = threading.enumerate()
+        logging.info(f"[P2PStream] Active threads after close: {[t.name for t in active_threads]}")

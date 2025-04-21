@@ -3,8 +3,9 @@ import argparse
 from multiprocessing import Process
 from threading import Thread
 from login_ui import LoginUI
-from after_login_ui import AfterLoginUI  # Import the new UI
+from after_login_ui import AfterLoginUI
 import time
+import sys
 
 def new_connection(tid, host, port):
     print(f'Process ID {tid} connecting to {host}:{port}')
@@ -31,6 +32,8 @@ def new_connection(tid, host, port):
             print(f"Process ID {tid} closed socket connection to {host}:{port}")
         except Exception as e:
             print(f"Process ID {tid} error closing socket: {e}")
+        # Explicitly exit the process to ensure termination
+        sys.exit(0)
 
 def connect_server(processnum, host, port):
     """Spawn multiple client processes to connect to the server."""

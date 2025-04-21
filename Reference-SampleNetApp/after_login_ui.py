@@ -3,14 +3,13 @@ from tkinter import messagebox, ttk
 from tkinter import Canvas, Scrollbar
 import threading
 import socket
-from datetime import datetime
-import errno
-import queue
 import time
+import queue
 import cv2
 import numpy as np
 from PIL import Image, ImageTk
 from p2p_stream import P2PStream
+import errno
 
 class AfterLoginUI:
     def __init__(self, mode, identifier, user_id, conn, channel_id=None):
@@ -24,14 +23,14 @@ class AfterLoginUI:
         self.conn.setblocking(False)
 
         self.channels = {}
-        self.selected_channel_id = str(channel_id) if channel_id is not None else None  # Ensure string
+        self.selected_channel_id = str(channel_id) if channel_id is not None else None
         self.user_id_to_username = {user_id: identifier}
         self.user_id_to_status = {user_id: self.status}
         self.displayed_messages = set()
         self.joined_channels = set()
         self.response_queue = queue.Queue()
         self.status_response_queue = queue.Queue()
-        self.last_status_change = 0
+        self.last_status_change = time.time()  # Initialize to current time
         self.status_debounce_delay = 0.5
 
         print(f"[AfterLoginUI] Initializing UI for user: {self.identifier} (ID: {self.user_id}), mode: {self.mode}, initial status: {self.status}")
@@ -139,10 +138,10 @@ class AfterLoginUI:
         self.own_stream_label = None
 
         self.running = True
-        self.listener_thread = threading.Thread(target=self.listen_for_updates)
+        self.listener_thread = threading.Thread(target=self.listen_for_updates, daemon=True)
         self.listener_thread.start()
 
-        self.status_response_thread = threading.Thread(target=self.process_status_responses)
+        self.status_response_thread = threading.Thread(target=self.process_status_responses, daemon=True)
         self.status_response_thread.start()
 
         self.fetch_channels()
@@ -271,7 +270,6 @@ class AfterLoginUI:
                 for message in messages:
                     if not message:
                         continue
-                    # Split the message without limiting the number of splits
                     command = message.split()
                     print(f"[AfterLoginUI] Parsed command: {command}, length: {len(command)}")
 
@@ -433,7 +431,7 @@ class AfterLoginUI:
                             else:
                                 print(f"[AfterLoginUI] Skipped LIVESTREAM_STOP: channel_id={channel_id}, selected_channel_id={self.selected_channel_id}, streamer_id={streamer_id}, self.user_id={self.user_id}")
                         except Exception as e:
-                            print(f"[AfterLoginUI] Error handling LIVESTREAM_STOP: message={message}, error={str(e)}")
+                            print(f"[AfterLoginUI] Error handling LIVESTREAM_STOP: message={message}, error: {str(e)}")
 
                     elif command[0] == "STREAM_STARTED":
                         print(f"[AfterLoginUI] Stream started confirmation received for {self.identifier} (ID: {self.user_id})")
@@ -580,7 +578,7 @@ class AfterLoginUI:
         self.root.update()
 
     def select_channel(self, channel_id):
-        self.selected_channel_id = str(channel_id)  # Ensure string
+        self.selected_channel_id = str(channel_id)
         self.stream.channel_id = str(channel_id)
         channel = self.channels.get(channel_id)
         if not channel:
@@ -887,17 +885,15 @@ class AfterLoginUI:
                 print(f"[AfterLoginUI] No video label for {streamer_id}, stream may have ended")
                 return
 
-            # Convert the frame to a format Tkinter can display
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)  # Ensure correct color format
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
             image = Image.fromarray(frame_rgb)
             image = image.resize((320, 240), Image.Resampling.LANCZOS)
             photo = ImageTk.PhotoImage(image)
 
-            # Update the video label
             video_label = self.video_labels[streamer_id]
             video_label.configure(image=photo)
-            video_label.image = photo  # Keep a reference to avoid garbage collection
-            video_label.update()  # Force Tkinter to update the display
+            video_label.image = photo
+            video_label.update()
             print(f"[AfterLoginUI] Updated video display for {streamer_id}, label visible: {video_label.winfo_exists()}")
         except Exception as e:
             print(f"[AfterLoginUI] Error displaying frame from {streamer_id}: {e}")
@@ -912,20 +908,49 @@ class AfterLoginUI:
             print(f"[AfterLoginUI] Stream ended for {streamer_id}, but no video label found")
 
     def close(self):
-        self.running = False
-        self.stream.close()
         print(f"[AfterLoginUI] Closing UI for {self.identifier} (ID: {self.user_id})")
-        if self.mode == "authenticated":
-            try:
-                if self.status != "Invisible":
-                    self.conn.sendall(f"SET_STATUS {self.user_id} Offline".encode())
-                    print(f"[AfterLoginUI] Sent SET_STATUS Offline for {self.identifier} (ID: {self.user_id}) on logout")
-            except Exception as e:
-                print(f"[AfterLoginUI] Error setting status to Offline on logout for {self.identifier} (ID: {self.user_id}): {e}")
+        self.running = False
+
+        # Stop any active streams
+        try:
+            if self.stream:
+                print(f"[AfterLoginUI] Closing P2PStream for {self.identifier} (ID: {self.user_id})")
+                self.stream.close()
+        except Exception as e:
+            print(f"[AfterLoginUI] Error stopping streams on logout: {e}")
+
+        # Send SET_STATUS Offline
+        try:
+            self.conn.sendall(f"SET_STATUS Offline {self.user_id}".encode())
+            print(f"[AfterLoginUI] Sent SET_STATUS Offline for {self.identifier} (ID: {self.user_id}) on logout")
+        except Exception as e:
+            print(f"[AfterLoginUI] Error sending SET_STATUS Offline: {e}")
+
+        # Wait for threads to exit
+        try:
+            if self.listener_thread and self.listener_thread.is_alive():
+                self.listener_thread.join(timeout=1.0)
+                print(f"[AfterLoginUI] Listener thread exited for {self.identifier} (ID: {self.user_id})")
+            if self.status_response_thread and self.status_response_thread.is_alive():
+                self.status_response_thread.join(timeout=1.0)
+                print(f"[AfterLoginUI] Status response thread exited for {self.identifier} (ID: {self.user_id})")
+        except Exception as e:
+            print(f"[AfterLoginUI] Error joining threads: {e}")
+
+        # Close the socket connection
         try:
             self.conn.close()
             print(f"[AfterLoginUI] Closed connection for {self.identifier} (ID: {self.user_id})")
         except Exception as e:
-            print(f"[AfterLoginUI] Error closing connection for {self.identifier} (ID: {self.user_id}): {e}")
-        self.root.destroy()
-        print(f"[AfterLoginUI] UI destroyed for {self.identifier} (ID: {self.user_id})")
+            print(f"[AfterLoginUI] Error closing connection: {e}")
+
+        # Destroy the UI
+        try:
+            self.root.destroy()
+            print(f"[AfterLoginUI] UI destroyed for {self.identifier} (ID: {self.user_id})")
+        except Exception as e:
+            print(f"[AfterLoginUI] Error destroying UI: {e}")
+
+        # Log active threads for diagnostics
+        active_threads = threading.enumerate()
+        print(f"[AfterLoginUI] Active threads after close: {[t.name for t in active_threads]}")
