@@ -695,6 +695,17 @@ class AfterLoginUI:
 
     def select_channel(self, channel_id):
         print(f"[AfterLoginUI] Selecting channel {channel_id} for {self.identifier} (ID: {self.user_id})")
+
+        # Stop receiving streams from the previous channel
+        for streamer_id in list(self.video_labels.keys()):
+            if streamer_id != self.user_id:  # Don't stop own stream, as it's managed separately
+                try:
+                    self.stream.stop_receiving(streamer_id)
+                    print(f"[AfterLoginUI] Stopped receiving stream from {streamer_id} before switching to channel {channel_id}")
+                    self.on_stream_ended(streamer_id)
+                except Exception as e:
+                    print(f"[AfterLoginUI] Error stopping stream reception from {streamer_id} before switching channels: {e}")
+
         self.selected_channel_id = str(channel_id)
         self.stream.channel_id = str(channel_id)
         channel = self.channels.get(channel_id)
@@ -993,13 +1004,19 @@ class AfterLoginUI:
         print(f"[AfterLoginUI] Closing UI for {self.identifier} (ID: {self.user_id})")
         self.running = False
 
+        # Prioritize stopping the stream to ensure it's stopped before any other cleanup
         if self.is_streaming:
             try:
                 self.stream.stop_streaming()
-                print(f"[AfterLoginUI] Stopped streaming during close for {self.identifier} (ID: {self.user_id})")
+                print(f"[AfterLoginUI] Successfully stopped streaming during close for {self.identifier} (ID: {self.user_id})")
+                # Ensure UI and state are updated
+                self.is_streaming = False
+                self.streaming_channel_id = None
+                self.on_stream_ended(self.user_id)
             except Exception as e:
                 print(f"[AfterLoginUI] Error stopping stream during close for {self.identifier} (ID: {self.user_id}): {e}")
 
+        # Stop receiving streams from others
         for streamer_id in list(self.video_labels.keys()):
             try:
                 self.stream.stop_receiving(streamer_id)
@@ -1007,13 +1024,15 @@ class AfterLoginUI:
             except Exception as e:
                 print(f"[AfterLoginUI] Error stopping stream reception from {streamer_id} during close: {e}")
 
+        # Close the P2PStream instance
         try:
             if self.stream:
                 print(f"[AfterLoginUI] Closing P2PStream for {self.identifier} (ID: {self.user_id})")
                 self.stream.close()
         except Exception as e:
-            print(f"[AfterLoginUI] Error stopping streams on logout: {e}")
+            print(f"[AfterLoginUI] Error closing P2PStream on logout: {e}")
 
+        # Update status to Offline if not Invisible (for authenticated users)
         if self.mode == "authenticated" and self.status != "Invisible":
             try:
                 self.conn.sendall(f"SET_STATUS {self.user_id} Offline".encode())
@@ -1021,6 +1040,7 @@ class AfterLoginUI:
             except Exception as e:
                 print(f"[AfterLoginUI] Error sending SET_STATUS Offline: {e}")
 
+        # Join listener threads
         try:
             if self.listener_thread and self.listener_thread.is_alive():
                 self.listener_thread.join(timeout=1.0)
@@ -1031,17 +1051,20 @@ class AfterLoginUI:
         except Exception as e:
             print(f"[AfterLoginUI] Error joining threads: {e}")
 
+        # Close the socket connection
         try:
             self.conn.close()
             print(f"[AfterLoginUI] Closed connection for {self.identifier} (ID: {self.user_id})")
         except Exception as e:
             print(f"[AfterLoginUI] Error closing connection: {e}")
 
+        # Destroy the UI
         try:
             self.root.destroy()
             print(f"[AfterLoginUI] UI destroyed for {self.identifier} (ID: {self.user_id})")
         except Exception as e:
             print(f"[AfterLoginUI] Error destroying UI: {e}")
 
+        # Log active threads for diagnostics
         active_threads = threading.enumerate()
         print(f"[AfterLoginUI] Active threads after close: {[t.name for t in active_threads]}")

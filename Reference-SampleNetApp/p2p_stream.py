@@ -5,7 +5,6 @@ import cv2
 import numpy as np
 import struct
 import time
-import threading
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -22,7 +21,8 @@ class P2PStream:
         self.clients = []
         self.clients_lock = threading.Lock()
         self.stream_port = None
-        self.active_streams = {}
+        self.active_streams = {}  # streamer_id -> (client_socket, receive_thread, is_socket_open)
+        self.active_streams_lock = threading.Lock()  # Lock for active_streams access
         self.last_frame = None
         self.stream_thread = None
         self.accept_thread = None
@@ -222,8 +222,9 @@ class P2PStream:
             logging.info(f"[P2PStream] Connected to streamer {streamer_id} at {ip}:{port}")
 
             receive_thread = threading.Thread(target=self.receive_stream, args=(streamer_id, client_socket), daemon=True)
+            with self.active_streams_lock:
+                self.active_streams[streamer_id] = (client_socket, receive_thread, True)  # True indicates socket is open
             receive_thread.start()
-            self.active_streams[streamer_id] = (client_socket, receive_thread)
         except socket.timeout as e:
             logging.error(f"[P2PStream] Timeout connecting to streamer {streamer_id} at {ip}:{port}: {e}")
             if client_socket:
@@ -242,24 +243,49 @@ class P2PStream:
 
     def stop_receiving(self, streamer_id):
         logging.info(f"[P2PStream] Stopping receiving stream from {streamer_id}")
-        if streamer_id in self.active_streams:
-            client_socket, receive_thread = self.active_streams[streamer_id]
-            try:
-                client_socket.close()
-            except Exception as e:
-                logging.error(f"[P2PStream] Error closing client socket for {streamer_id}: {e}")
+        with self.active_streams_lock:
+            if streamer_id not in self.active_streams:
+                logging.warning(f"[P2PStream] No active stream found for {streamer_id}")
+                return
+            client_socket, receive_thread, is_socket_open = self.active_streams[streamer_id]
+            # Close the socket only if it hasn't been closed already
+            if is_socket_open:
+                try:
+                    client_socket.close()
+                    logging.info(f"[P2PStream] Closed client socket for {streamer_id}")
+                except Exception as e:
+                    logging.warning(f"[P2PStream] Error closing client socket for {streamer_id}: {e}")
+                # Update the tuple to mark the socket as closed
+                self.active_streams[streamer_id] = (client_socket, receive_thread, False)
+            else:
+                logging.info(f"[P2PStream] Socket for {streamer_id} was already closed")
+
+            # Remove the stream entry
             del self.active_streams[streamer_id]
-            if receive_thread.is_alive():
-                receive_thread.join(timeout=1.0)
-                logging.info(f"[P2PStream] Receive thread for {streamer_id} terminated")
-            logging.info(f"[P2PStream] Stopped receiving stream from {streamer_id}")
-        else:
-            logging.warning(f"[P2PStream] No active stream found for {streamer_id}")
+
+        # Wait for the receive thread to terminate
+        if receive_thread.is_alive():
+            receive_thread.join(timeout=1.0)
+            logging.info(f"[P2PStream] Receive thread for {streamer_id} terminated")
+
+        if self.on_stream_ended:
+            logging.info(f"[P2PStream] Calling on_stream_ended for streamer {streamer_id}")
+            self.on_stream_ended(streamer_id)
+        logging.info(f"[P2PStream] Stopped receiving stream from {streamer_id}")
 
     def receive_stream(self, streamer_id, client_socket):
         logging.info(f"[P2PStream] Started receive_stream thread for streamer {streamer_id}")
         try:
-            while streamer_id in self.active_streams:
+            while True:
+                with self.active_streams_lock:
+                    if streamer_id not in self.active_streams:
+                        logging.info(f"[P2PStream] Stream for {streamer_id} stopped, exiting receive loop")
+                        break
+                    _, _, is_socket_open = self.active_streams[streamer_id]
+                    if not is_socket_open:
+                        logging.info(f"[P2PStream] Socket for {streamer_id} closed, exiting receive loop")
+                        break
+
                 logging.debug(f"[P2PStream] Waiting to receive frame size from {streamer_id}")
                 size_data = client_socket.recv(4)
                 if len(size_data) != 4:
@@ -295,18 +321,30 @@ class P2PStream:
             logging.error(f"[P2PStream] Error receiving stream from {streamer_id}: {e}")
         finally:
             logging.info(f"[P2PStream] Cleaning up receive_stream for streamer {streamer_id}")
-            client_socket.close()
-            if streamer_id in self.active_streams:
-                del self.active_streams[streamer_id]
-                if self.on_stream_ended:
-                    logging.info(f"[P2PStream] Calling on_stream_ended for streamer {streamer_id}")
-                    self.on_stream_ended(streamer_id)
+            # Only close the socket if it hasn't been closed already
+            with self.active_streams_lock:
+                if streamer_id in self.active_streams:
+                    client_socket, receive_thread, is_socket_open = self.active_streams[streamer_id]
+                    if is_socket_open:
+                        try:
+                            client_socket.close()
+                            logging.info(f"[P2PStream] Closed client socket for {streamer_id} in receive_stream")
+                        except Exception as e:
+                            logging.warning(f"[P2PStream] Error closing client socket for {streamer_id} in receive_stream: {e}")
+                        # Update the tuple to mark the socket as closed
+                        self.active_streams[streamer_id] = (client_socket, receive_thread, False)
+                    # Remove the stream entry
+                    del self.active_streams[streamer_id]
+                    if self.on_stream_ended:
+                        logging.info(f"[P2PStream] Calling on_stream_ended for streamer {streamer_id}")
+                        self.on_stream_ended(streamer_id)
 
     def close(self):
         logging.info(f"[P2PStream] Closing P2PStream for user {self.user_id}")
         self.stop_streaming()
-        for streamer_id in list(self.active_streams.keys()):
-            self.stop_receiving(streamer_id)
+        with self.active_streams_lock:
+            for streamer_id in list(self.active_streams.keys()):
+                self.stop_receiving(streamer_id)
         # Log active threads for diagnostics
         active_threads = threading.enumerate()
         logging.info(f"[P2PStream] Active threads after close: {[t.name for t in active_threads]}")
