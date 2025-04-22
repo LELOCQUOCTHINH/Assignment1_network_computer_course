@@ -41,7 +41,7 @@ class P2PStream:
             logging.error(f"[P2PStream] Error determining local IP: {e}")
             return "127.0.0.1"
 
-    def start(self, host=None):
+    def start_streaming(self, host=None):
         if self.streaming:
             logging.warning("[P2PStream] Already streaming")
             return
@@ -68,7 +68,7 @@ class P2PStream:
             self.accept_thread.start()
         except Exception as e:
             logging.error(f"[P2PStream] Error starting stream: {e}")
-            self.stop()
+            self.stop_streaming()
 
     def stream_video(self):
         try:
@@ -135,7 +135,7 @@ class P2PStream:
                 except Exception as e:
                     logging.error(f"[P2PStream] Error releasing VideoCapture: {e}")
                 self.cap = None
-            self.stop()
+            self.stop_streaming()
 
     def accept_viewers(self):
         while self.running and self.streaming:
@@ -154,7 +154,7 @@ class P2PStream:
                 break
         logging.info("[P2PStream] Stopped accepting viewers")
 
-    def stop(self):
+    def stop_streaming(self):
         if not self.streaming:
             return
         self.streaming = False
@@ -304,7 +304,7 @@ class P2PStream:
 
     def close(self):
         logging.info(f"[P2PStream] Closing P2PStream for user {self.user_id}")
-        self.stop()
+        self.stop_streaming()
         for streamer_id in list(self.active_streams.keys()):
             self.stop_receiving(streamer_id)
         # Log active threads for diagnostics

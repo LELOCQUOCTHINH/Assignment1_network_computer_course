@@ -323,8 +323,8 @@ class AfterLoginUI:
                                     self.fetch_status(member_id)
                             self.update_channel_lists()
                             if str(self.selected_channel_id) == str(channel_id):
-                                print(f"[AfterLoginUI] Channel {channel_id} is currently selected, refreshing UI")
-                                self.select_channel(channel_id)
+                                print(f"[AfterLoginUI] Channel {channel_id} is currently selected, updating member list")
+                                self.update_member_list(channel_id)
                         except (ValueError, IndexError) as e:
                             print(f"[AfterLoginUI] Error parsing CHANNEL message: {message}, error: {e}")
 
@@ -370,10 +370,6 @@ class AfterLoginUI:
                     elif command[0] == "NO_MESSAGES":
                         pass
 
-                    elif command[0] == "MESSAGE_SENT":
-                        print(f"[AfterLoginUI] Message sent successfully for {self.identifier} (ID: {self.user_id})")
-                        self.root.after(0, self.message_entry.delete, 0, tk.END)
-
                     elif command[0] in ["VISITOR_NOT_ALLOWED", "CHANNEL_NOT_FOUND", "NOT_A_MEMBER"]:
                         error_msg = {
                             "VISITOR_NOT_ALLOWED": "Visitors cannot send messages.",
@@ -401,7 +397,7 @@ class AfterLoginUI:
                                 if channel:
                                     all_members = [channel["host"]] + channel["regular_members"] + channel["visitors"]
                                     if user_id in all_members:
-                                        self.select_channel(int(self.selected_channel_id))
+                                        self.update_member_list(int(self.selected_channel_id))
                         except (ValueError, IndexError) as e:
                             print(f"[AfterLoginUI] Error parsing STATUS message: {message}, error: {e}")
 
@@ -476,11 +472,7 @@ class AfterLoginUI:
                         self.streaming_channel_id = self.selected_channel_id
                         self.root.after(0, lambda: self.start_stream_button.config(state="disabled"))
                         self.root.after(0, lambda: self.stop_stream_button.config(state="normal"))
-                        label = tk.Label(self.stream_frame, text="Your Stream", font=("Arial", 10), bg=self.main_color, fg=self.text_color)
-                        label.pack()
-                        self.own_stream_label = tk.Label(self.stream_frame)
-                        self.own_stream_label.pack()
-                        self.video_labels[self.user_id] = self.own_stream_label
+                        self.add_own_stream_ui()
 
                     elif command[0] == "STREAM_STOPPED":
                         print(f"[AfterLoginUI] Stream stopped confirmation received for {self.identifier} (ID: {self.user_id})")
@@ -618,7 +610,91 @@ class AfterLoginUI:
 
         self.root.update()
 
+    def add_own_stream_ui(self):
+        if self.is_streaming and self.streaming_channel_id == self.selected_channel_id:
+            label = tk.Label(self.stream_frame, text="Your Stream", font=("Arial", 10), bg=self.main_color, fg=self.text_color)
+            label.pack()
+            self.own_stream_label = tk.Label(self.stream_frame)
+            self.own_stream_label.pack()
+            self.video_labels[self.user_id] = self.own_stream_label
+            print(f"[AfterLoginUI] Added own stream UI for {self.identifier} (ID: {self.user_id}) in channel {self.selected_channel_id}")
+
+    def update_member_list(self, channel_id):
+        channel = self.channels.get(channel_id)
+        if not channel:
+            print(f"[AfterLoginUI] Channel {channel_id} not found in self.channels")
+            return
+
+        if hasattr(self, 'member_frame'):
+            for widget in self.member_frame.winfo_children():
+                widget.destroy()
+
+            tk.Label(self.member_frame, text="Members", font=("Arial", 12, "bold"), bg=self.main_color, fg=self.text_color).pack(pady=5)
+
+            host_username = self.get_username(channel["host"])
+            host_status = self.fetch_status(channel["host"])
+            host_frame = tk.Frame(self.member_frame, bg=self.main_color)
+            host_frame.pack(anchor="w", padx=10, pady=2)
+            tk.Label(host_frame, text=f"The host: {host_username}", font=("Arial", 10), bg=self.main_color, fg=self.text_color).pack(side="left")
+            host_status_color = self.get_status_color(host_status)
+            if host_status_color:
+                host_dot_canvas = tk.Canvas(host_frame, width=14, height=14, bg=self.main_color, highlightthickness=0)
+                host_dot_canvas.create_oval(4, 4, 10, 10, fill=host_status_color)
+                host_dot_canvas.pack(side="left", padx=(5, 0))
+
+            other_members = [(member, self.get_username(member)) for member in channel["regular_members"] if member != channel["host"]]
+            if other_members:
+                tk.Label(self.member_frame, text="Other members:", font=("Arial", 10), bg=self.main_color, fg=self.text_color).pack(anchor="w", padx=10, pady=2)
+                for member_id, member_name in other_members:
+                    member_frame_inner = tk.Frame(self.member_frame, bg=self.main_color)
+                    member_frame_inner.pack(anchor="w", padx=20, pady=1)
+                    tk.Label(member_frame_inner, text=member_name, font=("Arial", 10), bg=self.main_color, fg=self.text_color).pack(side="left")
+                    member_status = self.fetch_status(member_id)
+                    member_status_color = self.get_status_color(member_status)
+                    if member_status_color:
+                        member_dot_canvas = tk.Canvas(member_frame_inner, width=14, height=14, bg=self.main_color, highlightthickness=0)
+                        member_dot_canvas.create_oval(4, 4, 10, 10, fill=member_status_color)
+                        member_dot_canvas.pack(side="left", padx=(5, 0))
+
+            visitors = [(visitor, self.get_username(visitor)) for visitor in channel["visitors"]]
+            if visitors:
+                tk.Label(self.member_frame, text="Visitors:", font=("Arial", 10), bg=self.main_color, fg=self.text_color).pack(anchor="w", padx=10, pady=2)
+                for visitor_id, visitor_name in visitors:
+                    visitor_frame = tk.Frame(self.member_frame, bg=self.main_color)
+                    visitor_frame.pack(anchor="w", padx=20, pady=1)
+                    tk.Label(visitor_frame, text=visitor_name, font=("Arial", 10), bg=self.main_color, fg=self.text_color).pack(side="left")
+                    visitor_status = self.fetch_status(visitor_id)
+                    visitor_status_color = self.get_status_color(visitor_status)
+                    if visitor_status_color:
+                        visitor_dot_canvas = tk.Canvas(visitor_frame, width=14, height=14, bg=self.main_color, highlightthickness=0)
+                        visitor_dot_canvas.create_oval(4, 4, 10, 10, fill=visitor_status_color)
+                        visitor_dot_canvas.pack(side="left", padx=(5, 0))
+
+            all_members = channel["regular_members"] + channel["visitors"]
+            is_host = channel["host"] == self.user_id
+            if self.user_id in all_members and not is_host:
+                leave_btn = tk.Button(
+                    self.member_frame,
+                    text="LEAVE CHANNEL",
+                    command=lambda: self.leave_channel(channel_id),
+                    width=15,
+                    bg=self.leave_btn_color,
+                    fg=self.text_color,
+                    font=("Arial", 10),
+                    borderwidth=1,
+                    highlightthickness=1,
+                    highlightbackground=self.sidebar_color,
+                    relief="raised",
+                    padx=10,
+                    pady=5
+                )
+                leave_btn.pack(pady=10)
+
+                leave_btn.bind("<Enter>", lambda e: leave_btn.config(bg=self.leave_btn_hover_color))
+                leave_btn.bind("<Leave>", lambda e: leave_btn.config(bg=self.leave_btn_color))
+
     def select_channel(self, channel_id):
+        print(f"[AfterLoginUI] Selecting channel {channel_id} for {self.identifier} (ID: {self.user_id})")
         self.selected_channel_id = str(channel_id)
         self.stream.channel_id = str(channel_id)
         channel = self.channels.get(channel_id)
@@ -632,16 +708,16 @@ class AfterLoginUI:
         for widget in self.content_frame.winfo_children():
             widget.destroy()
 
-        chat_main_frame = tk.Frame(self.content_frame, bg=self.main_color)
-        chat_main_frame.pack(fill="both", expand=True)
+        self.chat_main_frame = tk.Frame(self.content_frame, bg=self.main_color)
+        self.chat_main_frame.pack(fill="both", expand=True)
 
-        chat_left_frame = tk.Frame(chat_main_frame, bg=self.main_color)
-        chat_left_frame.pack(side="left", fill="both", expand=True)
+        self.chat_left_frame = tk.Frame(self.chat_main_frame, bg=self.main_color)
+        self.chat_left_frame.pack(side="left", fill="both", expand=True)
 
-        channel_label = tk.Label(chat_left_frame, text=f"{channel['name']}", font=("Arial", 16, "bold"), bg=self.main_color, fg=self.text_color)
+        channel_label = tk.Label(self.chat_left_frame, text=f"{channel['name']}", font=("Arial", 16, "bold"), bg=self.main_color, fg=self.text_color)
         channel_label.pack(pady=10)
 
-        message_frame = tk.Frame(chat_left_frame, bg=self.main_color)
+        message_frame = tk.Frame(self.chat_left_frame, bg=self.main_color)
         message_frame.pack(fill="both", expand=True, padx=10)
 
         canvas = Canvas(message_frame, bg=self.main_color, highlightthickness=0)
@@ -659,7 +735,7 @@ class AfterLoginUI:
         scrollbar.pack(side="right", fill="y")
         canvas.pack(side="left", fill="both", expand=True)
 
-        input_frame = tk.Frame(chat_left_frame, bg=self.main_color)
+        input_frame = tk.Frame(self.chat_left_frame, bg=self.main_color)
         input_frame.pack(fill="x", padx=10, pady=5)
 
         self.message_entry = tk.Entry(input_frame, bg="#2f3136", fg=self.text_color, font=("Arial", 10))
@@ -673,97 +749,36 @@ class AfterLoginUI:
             send_btn.config(state="disabled")
 
         if self.mode == "authenticated":
-            self.start_stream_button = tk.Button(chat_left_frame, text="Start Streaming", command=self.start_streaming, bg=self.create_btn_color, fg="white", font=("Arial", 10))
+            self.start_stream_button = tk.Button(self.chat_left_frame, text="Start Streaming", command=self.start_streaming, bg=self.create_btn_color, fg="white", font=("Arial", 10))
             self.start_stream_button.pack(pady=5)
-            self.stop_stream_button = tk.Button(chat_left_frame, text="Stop Streaming", command=self.stop_streaming, bg=self.leave_btn_color, fg="white", font=("Arial", 10))
+            self.stop_stream_button = tk.Button(self.chat_left_frame, text="Stop Streaming", command=self.stop_streaming, bg=self.leave_btn_color, fg="white", font=("Arial", 10))
             self.stop_stream_button.pack(pady=5)
-            # Update button states based on streaming state
             if self.is_streaming and self.streaming_channel_id == self.selected_channel_id:
                 self.start_stream_button.config(state="disabled")
                 self.stop_stream_button.config(state="normal")
-                label = tk.Label(self.stream_frame, text="Your Stream", font=("Arial", 10), bg=self.main_color, fg=self.text_color)
-                label.pack()
-                self.own_stream_label = tk.Label(self.stream_frame)
-                self.own_stream_label.pack()
-                self.video_labels[self.user_id] = self.own_stream_label
             else:
                 self.start_stream_button.config(state="normal")
                 self.stop_stream_button.config(state="disabled")
 
-        self.stream_frame = tk.Frame(chat_left_frame, bg=self.main_color)
+        self.stream_frame = tk.Frame(self.chat_left_frame, bg=self.main_color)
         self.stream_frame.pack(fill="both", expand=True)
 
-        member_frame = tk.Frame(chat_main_frame, bg=self.main_color, width=150)
-        member_frame.pack(side="right", fill="y")
-        member_frame.pack_propagate(False)
+        self.add_own_stream_ui()
 
-        tk.Label(member_frame, text="Members", font=("Arial", 12, "bold"), bg=self.main_color, fg=self.text_color).pack(pady=5)
+        self.member_frame = tk.Frame(self.chat_main_frame, bg=self.main_color, width=150)
+        self.member_frame.pack(side="right", fill="y")
+        self.member_frame.pack_propagate(False)
 
-        host_username = self.get_username(channel["host"])
-        host_status = self.fetch_status(channel["host"])
-        host_frame = tk.Frame(member_frame, bg=self.main_color)
-        host_frame.pack(anchor="w", padx=10, pady=2)
-        tk.Label(host_frame, text=f"The host: {host_username}", font=("Arial", 10), bg=self.main_color, fg=self.text_color).pack(side="left")
-        host_status_color = self.get_status_color(host_status)
-        if host_status_color:
-            host_dot_canvas = tk.Canvas(host_frame, width=14, height=14, bg=self.main_color, highlightthickness=0)
-            host_dot_canvas.create_oval(4, 4, 10, 10, fill=host_status_color)
-            host_dot_canvas.pack(side="left", padx=(5, 0))
-
-        other_members = [(member, self.get_username(member)) for member in channel["regular_members"] if member != channel["host"]]
-        if other_members:
-            tk.Label(member_frame, text="Other members:", font=("Arial", 10), bg=self.main_color, fg=self.text_color).pack(anchor="w", padx=10, pady=2)
-            for member_id, member_name in other_members:
-                member_frame_inner = tk.Frame(member_frame, bg=self.main_color)
-                member_frame_inner.pack(anchor="w", padx=20, pady=1)
-                tk.Label(member_frame_inner, text=member_name, font=("Arial", 10), bg=self.main_color, fg=self.text_color).pack(side="left")
-                member_status = self.fetch_status(member_id)
-                member_status_color = self.get_status_color(member_status)
-                if member_status_color:
-                    member_dot_canvas = tk.Canvas(member_frame_inner, width=14, height=14, bg=self.main_color, highlightthickness=0)
-                    member_dot_canvas.create_oval(4, 4, 10, 10, fill=member_status_color)
-                    member_dot_canvas.pack(side="left", padx=(5, 0))
-
-        visitors = [(visitor, self.get_username(visitor)) for visitor in channel["visitors"]]
-        if visitors:
-            tk.Label(member_frame, text="Visitors:", font=("Arial", 10), bg=self.main_color, fg=self.text_color).pack(anchor="w", padx=10, pady=2)
-            for visitor_id, visitor_name in visitors:
-                visitor_frame = tk.Frame(member_frame, bg=self.main_color)
-                visitor_frame.pack(anchor="w", padx=20, pady=1)
-                tk.Label(visitor_frame, text=visitor_name, font=("Arial", 10), bg=self.main_color, fg=self.text_color).pack(side="left")
-                visitor_status = self.fetch_status(visitor_id)
-                visitor_status_color = self.get_status_color(visitor_status)
-                if visitor_status_color:
-                    visitor_dot_canvas = tk.Canvas(visitor_frame, width=14, height=14, bg=self.main_color, highlightthickness=0)
-                    visitor_dot_canvas.create_oval(4, 4, 10, 10, fill=visitor_status_color)
-                    visitor_dot_canvas.pack(side="left", padx=(5, 0))
+        self.update_member_list(channel_id)
 
         all_members = channel["regular_members"] + channel["visitors"]
         is_host = channel["host"] == self.user_id
         if self.user_id in all_members and not is_host:
-            leave_btn = tk.Button(
-                member_frame,
-                text="LEAVE CHANNEL",
-                command=lambda: self.leave_channel(channel_id),
-                width=15,
-                bg=self.leave_btn_color,
-                fg=self.text_color,
-                font=("Arial", 10),
-                borderwidth=1,
-                highlightthickness=1,
-                highlightbackground=self.sidebar_color,
-                relief="raised",
-                padx=10,
-                pady=5
-            )
-            leave_btn.pack(pady=10)
-
-            leave_btn.bind("<Enter>", lambda e: leave_btn.config(bg=self.leave_btn_hover_color))
-            leave_btn.bind("<Leave>", lambda e: leave_btn.config(bg=self.leave_btn_color))
+            pass  # Leave button is added in update_member_list
         else:
             if not is_host:
-                tk.Label(chat_left_frame, text="You're not a member of this channel", font=("Arial", 12), bg=self.main_color, fg=self.text_color).pack(pady=10)
-                join_btn = tk.Button(chat_left_frame, text="Join this channel", command=lambda: self.join_channel(channel_id),
+                tk.Label(self.chat_left_frame, text="You're not a member of this channel", font=("Arial", 12), bg=self.main_color, fg=self.text_color).pack(pady=10)
+                join_btn = tk.Button(self.chat_left_frame, text="Join this channel", command=lambda: self.join_channel(channel_id),
                                      bg=self.join_btn_color, fg="white", font=("Arial", 10))
                 join_btn.pack(pady=5)
 
@@ -918,7 +933,7 @@ class AfterLoginUI:
             print(f"[AfterLoginUI] Streaming failed: no channel selected for {self.identifier} (ID: {self.user_id})")
             return
         try:
-            self.stream.start()
+            self.stream.start_streaming()
             print(f"[AfterLoginUI] Started streaming for {self.identifier} (ID: {self.user_id}) in channel {self.selected_channel_id}")
         except Exception as e:
             print(f"[AfterLoginUI] Error starting stream for {self.identifier} (ID: {self.user_id}): {e}")
@@ -926,7 +941,7 @@ class AfterLoginUI:
 
     def stop_streaming(self):
         try:
-            self.stream.stop()
+            self.stream.stop_streaming()
             print(f"[AfterLoginUI] Stopped streaming for {self.identifier} (ID: {self.user_id}) in channel {self.selected_channel_id}")
         except Exception as e:
             print(f"[AfterLoginUI] Error stopping stream for {self.identifier} (ID: {self.user_id}): {e}")
@@ -934,7 +949,7 @@ class AfterLoginUI:
 
     def on_frame(self, streamer_id, frame):
         try:
-            print(f"[AfterLoginUI] Received frame from {streamer_id}, shape: {frame.shape}")
+            # print(f"[AfterLoginUI] Received frame from {streamer_id}, shape: {frame.shape}")
             if streamer_id not in self.video_labels:
                 print(f"[AfterLoginUI] No video label for {streamer_id}, stream may have ended")
                 return
@@ -948,56 +963,57 @@ class AfterLoginUI:
             video_label.configure(image=photo)
             video_label.image = photo
             video_label.update()
-            print(f"[AfterLoginUI] Updated video display for {streamer_id}, label visible: {video_label.winfo_exists()}")
+            # print(f"[AfterLoginUI] Updated video display for {streamer_id}, label visible: {video_label.winfo_exists()}")
         except Exception as e:
             print(f"[AfterLoginUI] Error displaying frame from {streamer_id}: {e}")
 
     def on_stream_ended(self, streamer_id):
         print(f"[AfterLoginUI] on_stream_ended called for streamer {streamer_id}, current video_labels: {list(self.video_labels.keys())}")
         if streamer_id in self.video_labels:
-            video_label = self.video_labels[streamer_id]
-            # Remove the stream title label (e.g., "Your Stream" or "<username>'s Stream")
-            parent = video_label.master
+            label = self.video_labels[streamer_id]
+            parent = label.master
             for widget in parent.winfo_children():
-                if widget != video_label and isinstance(widget, tk.Label) and widget.cget("text") in [f"{self.get_username(streamer_id)}'s Stream", "Your Stream"]:
+                if widget != label and isinstance(widget, tk.Label) and widget.cget("text") in [f"{self.get_username(streamer_id)}'s Stream", "Your Stream"]:
                     widget.destroy()
-            video_label.destroy()
+            label.destroy()
             del self.video_labels[streamer_id]
             print(f"[AfterLoginUI] Stream ended for {streamer_id}, removed video display")
         else:
             print(f"[AfterLoginUI] Stream ended for {streamer_id}, but no video label found")
         if streamer_id == self.user_id:
             self.own_stream_label = None
+            self.is_streaming = False
+            self.streaming_channel_id = None
+            if hasattr(self, 'start_stream_button') and self.start_stream_button.winfo_exists():
+                self.start_stream_button.config(state="normal")
+            if hasattr(self, 'stop_stream_button') and self.stop_stream_button.winfo_exists():
+                self.stop_stream_button.config(state="disabled")
 
     def close(self):
         print(f"[AfterLoginUI] Closing UI for {self.identifier} (ID: {self.user_id})")
         self.running = False
 
-        # Stop any active stream if the user is streaming
         if self.is_streaming:
             try:
-                self.stream.stop()
-                print(f"[AfterLoginUI] Stopped streaming for {self.identifier} (ID: {self.user_id}) on logout")
+                self.stream.stop_streaming()
+                print(f"[AfterLoginUI] Stopped streaming during close for {self.identifier} (ID: {self.user_id})")
             except Exception as e:
-                print(f"[AfterLoginUI] Error stopping stream on logout: {e}")
+                print(f"[AfterLoginUI] Error stopping stream during close for {self.identifier} (ID: {self.user_id}): {e}")
 
-        # Stop receiving streams from other users
         for streamer_id in list(self.video_labels.keys()):
             try:
                 self.stream.stop_receiving(streamer_id)
-                print(f"[AfterLoginUI] Stopped receiving stream from {streamer_id} on logout")
+                print(f"[AfterLoginUI] Stopped receiving stream from {streamer_id} during close")
             except Exception as e:
-                print(f"[AfterLoginUI] Error stopping stream reception from {streamer_id} on logout: {e}")
+                print(f"[AfterLoginUI] Error stopping stream reception from {streamer_id} during close: {e}")
 
-        # Clean up P2PStream
         try:
             if self.stream:
                 print(f"[AfterLoginUI] Closing P2PStream for {self.identifier} (ID: {self.user_id})")
                 self.stream.close()
         except Exception as e:
-            print(f"[AfterLoginUI] Error closing P2PStream on logout: {e}")
+            print(f"[AfterLoginUI] Error stopping streams on logout: {e}")
 
-        # Send SET_STATUS Offline (respecting Invisible status)
         if self.mode == "authenticated" and self.status != "Invisible":
             try:
                 self.conn.sendall(f"SET_STATUS {self.user_id} Offline".encode())
@@ -1005,7 +1021,6 @@ class AfterLoginUI:
             except Exception as e:
                 print(f"[AfterLoginUI] Error sending SET_STATUS Offline: {e}")
 
-        # Wait for threads to exit
         try:
             if self.listener_thread and self.listener_thread.is_alive():
                 self.listener_thread.join(timeout=1.0)
@@ -1016,20 +1031,17 @@ class AfterLoginUI:
         except Exception as e:
             print(f"[AfterLoginUI] Error joining threads: {e}")
 
-        # Close the socket connection
         try:
             self.conn.close()
             print(f"[AfterLoginUI] Closed connection for {self.identifier} (ID: {self.user_id})")
         except Exception as e:
             print(f"[AfterLoginUI] Error closing connection: {e}")
 
-        # Destroy the UI
         try:
             self.root.destroy()
             print(f"[AfterLoginUI] UI destroyed for {self.identifier} (ID: {self.user_id})")
         except Exception as e:
             print(f"[AfterLoginUI] Error destroying UI: {e}")
 
-        # Log active threads for diagnostics
         active_threads = threading.enumerate()
         print(f"[AfterLoginUI] Active threads after close: {[t.name for t in active_threads]}")
