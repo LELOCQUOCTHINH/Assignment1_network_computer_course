@@ -11,6 +11,66 @@ peer_manager = PeerManager()
 USER_DB_FILE = 'users.json'
 CHANNEL_DB_FILE = 'channels.json'
 MESSAGE_DB_FILE = 'messages.json'
+LOG_FILE = 'connection_log.txt'
+MAX_LOG_RECORDS = 10000
+
+# Initialize log record counter
+log_record_count = 0
+
+def initialize_log():
+    """Initialize the log file and count existing records if the file exists."""
+    global log_record_count
+    if os.path.exists(LOG_FILE):
+        try:
+            with open(LOG_FILE, 'r') as f:
+                log_record_count = sum(1 for _ in f)
+            print(f"[Server] Log file {LOG_FILE} exists with {log_record_count} records.")
+        except Exception as e:
+            print(f"[Server] Error reading log file {LOG_FILE}: {e}. Starting with empty log.")
+            log_record_count = 0
+            with open(LOG_FILE, 'w') as f:
+                pass  # Create an empty log file
+    else:
+        print(f"[Server] Creating new log file {LOG_FILE}.")
+        with open(LOG_FILE, 'w') as f:
+            pass  # Create an empty log file
+        log_record_count = 0
+
+def rotate_log_file():
+    """Rotate the log file if it exceeds MAX_LOG_RECORDS."""
+    global log_record_count
+    if log_record_count >= MAX_LOG_RECORDS:
+        print(f"[Server] Log file {LOG_FILE} has reached {log_record_count} records. Rotating log file.")
+        # Backup the current log file with a timestamp
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        backup_file = f"connection_log_{timestamp}.txt"
+        try:
+            os.rename(LOG_FILE, backup_file)
+            print(f"[Server] Backed up log file to {backup_file}.")
+        except Exception as e:
+            print(f"[Server] Error backing up log file to {backup_file}: {e}.")
+        # Create a new empty log file
+        with open(LOG_FILE, 'w') as f:
+            pass
+        log_record_count = 0
+        print(f"[Server] Created new log file {LOG_FILE}.")
+
+def log_connection(event_type, source, details):
+    """Log a connection event to the log file."""
+    global log_record_count
+    timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    log_entry = f"[{timestamp}] {event_type} | Source: {source} | Details: {details}\n"
+    
+    # Rotate log file if necessary
+    rotate_log_file()
+    
+    try:
+        with open(LOG_FILE, 'a') as f:
+            f.write(log_entry)
+        log_record_count += 1
+        print(f"[Server] Logged: {log_entry.strip()}")
+    except Exception as e:
+        print(f"[Server] Error writing to log file {LOG_FILE}: {e}")
 
 def load_users():
     if os.path.exists(USER_DB_FILE):
@@ -88,6 +148,9 @@ visitor_ids = {}
 visitor_statuses = {}  # New dictionary to track visitor statuses
 livestreamers = {}  # {channel_id: (user_id, ip, port)} to track active livestreamers
 
+# Initialize the log file at server startup
+initialize_log()
+
 def get_user_id_by_username(username, is_visitor=False):
     if is_visitor:
         return visitor_ids.get(username)
@@ -122,8 +185,10 @@ def broadcast(message, exclude_conn=None):
         if client_conn != exclude_conn:
             try:
                 client_conn.sendall(f"{message}\n".encode())
-            except:
-                print(f"[Server] Failed to send message to {client_username}")
+                # Log the broadcast notification
+                log_connection("NOTIFICATION_SENT", "Centralized Server", f"Broadcasted message to {client_username}: {message}")
+            except Exception as e:
+                print(f"[Server] Failed to send message to {client_username}: {e}")
 
 def broadcast_to_channel(channel_id, message, exclude_conn=None):
     if channel_id not in channels:
@@ -136,8 +201,10 @@ def broadcast_to_channel(channel_id, message, exclude_conn=None):
         if client_user_id in members:
             try:
                 client_conn.sendall(f"{message}\n".encode())
-            except:
-                print(f"[Server] Failed to send message to {client_username} in channel {channel_id}")
+                # Log the broadcast notification to the channel
+                log_connection("NOTIFICATION_SENT", "Centralized Server", f"Broadcasted message to {client_username} in channel {channel_id}: {message}")
+            except Exception as e:
+                print(f"[Server] Failed to send message to {client_username} in channel {channel_id}: {e}")
 
 def handle_visitor(data, conn):
     global next_user_id
@@ -356,6 +423,16 @@ def handle_send_message(data, conn):
     save_messages()
     print(f"[Server] Stored message in channel {channel_id} from user ID {user_id}: {message}")
     
+    # Determine the source of the message (Centralized Server or Channel Hosting)
+    source = "Centralized Server"
+    if channel_id in livestreamers:
+        streamer_id, _, _ = livestreamers[channel_id]
+        if user_id == streamer_id:
+            source = f"Channel Hosting (Streamer ID: {streamer_id})"
+    
+    # Log the message with the source
+    log_connection("MESSAGE_SENT", source, f"User {user_id} sent message in channel {channel_id}: {message}")
+    
     broadcast_to_channel(channel_id, f"MESSAGE {channel_id} {user_id} {timestamp} | {message}")
     return "MESSAGE_SENT"
 
@@ -384,6 +461,8 @@ def handle_start_stream(data, conn):
     livestreamers[channel_id] = (user_id, ip, port)
     broadcast_to_channel(channel_id, f"LIVESTREAM_START {user_id} {channel_id} {ip} {port}", exclude_conn=conn)
     print(f"[Server] User {user_id} started streaming in channel {channel_id} at {ip}:{port}")
+    # Log the stream start
+    log_connection("STREAM_START", "Centralized Server", f"User {user_id} started streaming in channel {channel_id} at {ip}:{port}")
     return "STREAM_STARTED"
 
 def handle_stop_stream(data, conn):
@@ -395,6 +474,8 @@ def handle_stop_stream(data, conn):
         del livestreamers[channel_id]
         broadcast_to_channel(channel_id, f"LIVESTREAM_STOP {user_id} {channel_id}", exclude_conn=conn)
         print(f"[Server] User {user_id} stopped streaming in channel {channel_id}")
+        # Log the stream stop
+        log_connection("STREAM_STOP", "Centralized Server", f"User {user_id} stopped streaming in channel {channel_id}")
         return "STREAM_STOPPED"
     print(f"[Server] No active stream found for user {user_id} in channel {channel_id}")
     return "NO_STREAM"
@@ -450,6 +531,9 @@ def process_command(data, addr, conn):
         return "INVALID_COMMAND"
 
 def handle_client_messages(conn, addr, username=None, user_id=None):
+    # Log the initial connection
+    log_connection("CONNECTION_ESTABLISHED", "Centralized Server", f"Client connected from {addr}")
+    
     try:
         while True:
             data = conn.recv(1024).decode()
@@ -524,6 +608,8 @@ def handle_client_messages(conn, addr, username=None, user_id=None):
         if (conn, addr, username, user_id) in connected_clients:
             connected_clients.remove((conn, addr, username, user_id))
             print(f"[Server] Removed {username} (ID: {user_id}) from connected clients")
+            # Log the disconnection
+            log_connection("CONNECTION_CLOSED", "Centralized Server", f"Client {username} (ID: {user_id}) disconnected from {addr}")
         peer_manager.remove_peer(addr)
         conn.close()
 
