@@ -399,6 +399,18 @@ def handle_stop_stream(data, conn):
     print(f"[Server] No active stream found for user {user_id} in channel {channel_id}")
     return "NO_STREAM"
 
+def handle_get_active_streams(data):
+    _, channel_id = data.split()
+    if channel_id not in channels:
+        print(f"[Server] Channel {channel_id} not found for GET_ACTIVE_STREAMS")
+        return "CHANNEL_NOT_FOUND"
+    if channel_id in livestreamers:
+        streamer_id, ip, port = livestreamers[channel_id]
+        print(f"[Server] Active stream found in channel {channel_id}: streamer {streamer_id} at {ip}:{port}")
+        return f"ACTIVE_STREAM {streamer_id} {channel_id} {ip} {port}"
+    print(f"[Server] No active streams in channel {channel_id}")
+    return "NO_ACTIVE_STREAM"
+
 def process_command(data, addr, conn):
     print(f"[Server] Processing command from {addr}: {data}")
     if data.startswith("VISITOR"):
@@ -431,6 +443,8 @@ def process_command(data, addr, conn):
         return handle_start_stream(data, conn)
     elif data.startswith("STOP_STREAM"):
         return handle_stop_stream(data, conn)
+    elif data.startswith("GET_ACTIVE_STREAMS"):
+        return handle_get_active_streams(data)
     else:
         print(f"[Server] Invalid command from {addr}: {data}")
         return "INVALID_COMMAND"

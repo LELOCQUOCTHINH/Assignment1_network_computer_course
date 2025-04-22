@@ -33,6 +33,10 @@ class AfterLoginUI:
         self.last_status_change = time.time()  # Initialize to current time
         self.status_debounce_delay = 0.5
 
+        # Track streaming state
+        self.is_streaming = False
+        self.streaming_channel_id = None
+
         print(f"[AfterLoginUI] Initializing UI for user: {self.identifier} (ID: {self.user_id}), mode: {self.mode}, initial status: {self.status}")
 
         self.bg_color = "#7289da"
@@ -186,6 +190,13 @@ class AfterLoginUI:
             print(f"[AfterLoginUI] Sent GET_MESSAGES request for channel {channel_id}")
         except Exception as e:
             print(f"[AfterLoginUI] Error fetching messages for channel {channel_id}: {e}")
+
+    def fetch_active_streams(self, channel_id):
+        try:
+            self.conn.sendall(f"GET_ACTIVE_STREAMS {channel_id}".encode())
+            print(f"[AfterLoginUI] Sent GET_ACTIVE_STREAMS request for channel {channel_id}")
+        except Exception as e:
+            print(f"[AfterLoginUI] Error fetching active streams for channel {channel_id}: {e}")
 
     def fetch_username(self, user_id):
         if user_id in self.user_id_to_username:
@@ -433,8 +444,36 @@ class AfterLoginUI:
                         except Exception as e:
                             print(f"[AfterLoginUI] Error handling LIVESTREAM_STOP: message={message}, error: {str(e)}")
 
+                    elif command[0] == "ACTIVE_STREAM" and len(command) == 5:
+                        try:
+                            streamer_id, channel_id, ip, port = command[1], command[2], command[3], command[4]
+                            print(f"[AfterLoginUI] Processing ACTIVE_STREAM for {self.identifier} (ID: {self.user_id}): streamer_id={streamer_id}, channel_id={channel_id}, selected_channel_id={self.selected_channel_id}")
+                            if channel_id == str(self.selected_channel_id) and streamer_id != self.user_id:
+                                print(f"[AfterLoginUI] Found active stream: channel_id={channel_id}, selected_channel_id={self.selected_channel_id}, streamer_id={streamer_id}, self.user_id={self.user_id}")
+                                label = tk.Label(self.stream_frame, text=f"{self.get_username(streamer_id)}'s Stream", font=("Arial", 10), bg=self.main_color, fg=self.text_color)
+                                label.pack()
+                                video_label = tk.Label(self.stream_frame)
+                                video_label.pack()
+                                self.video_labels[streamer_id] = video_label
+                                self.stream.channel_id = channel_id
+                                print(f"[AfterLoginUI] Calling start_receiving for streamer_id={streamer_id}, ip={ip}, port={port}")
+                                try:
+                                    self.stream.start_receiving(streamer_id, ip, port)
+                                    print(f"[AfterLoginUI] Started receiving stream from {streamer_id} in channel {channel_id}")
+                                except Exception as e:
+                                    print(f"[AfterLoginUI] Exception in start_receiving for streamer_id={streamer_id}: {e}")
+                            else:
+                                print(f"[AfterLoginUI] Skipped ACTIVE_STREAM: channel_id={channel_id}, selected_channel_id={self.selected_channel_id}, streamer_id={streamer_id}, self.user_id={self.user_id}")
+                        except Exception as e:
+                            print(f"[AfterLoginUI] Error handling ACTIVE_STREAM: {message}, error: {e}")
+
+                    elif command[0] == "NO_ACTIVE_STREAM":
+                        print(f"[AfterLoginUI] No active streams in channel {self.selected_channel_id}")
+
                     elif command[0] == "STREAM_STARTED":
                         print(f"[AfterLoginUI] Stream started confirmation received for {self.identifier} (ID: {self.user_id})")
+                        self.is_streaming = True
+                        self.streaming_channel_id = self.selected_channel_id
                         self.root.after(0, lambda: self.start_stream_button.config(state="disabled"))
                         self.root.after(0, lambda: self.stop_stream_button.config(state="normal"))
                         label = tk.Label(self.stream_frame, text="Your Stream", font=("Arial", 10), bg=self.main_color, fg=self.text_color)
@@ -445,6 +484,8 @@ class AfterLoginUI:
 
                     elif command[0] == "STREAM_STOPPED":
                         print(f"[AfterLoginUI] Stream stopped confirmation received for {self.identifier} (ID: {self.user_id})")
+                        self.is_streaming = False
+                        self.streaming_channel_id = None
                         self.root.after(0, lambda: self.start_stream_button.config(state="normal"))
                         self.root.after(0, lambda: self.stop_stream_button.config(state="disabled"))
                         self.on_stream_ended(self.user_id)
@@ -634,8 +675,20 @@ class AfterLoginUI:
         if self.mode == "authenticated":
             self.start_stream_button = tk.Button(chat_left_frame, text="Start Streaming", command=self.start_streaming, bg=self.create_btn_color, fg="white", font=("Arial", 10))
             self.start_stream_button.pack(pady=5)
-            self.stop_stream_button = tk.Button(chat_left_frame, text="Stop Streaming", command=self.stop_streaming, bg=self.leave_btn_color, fg="white", font=("Arial", 10), state="disabled")
+            self.stop_stream_button = tk.Button(chat_left_frame, text="Stop Streaming", command=self.stop_streaming, bg=self.leave_btn_color, fg="white", font=("Arial", 10))
             self.stop_stream_button.pack(pady=5)
+            # Update button states based on streaming state
+            if self.is_streaming and self.streaming_channel_id == self.selected_channel_id:
+                self.start_stream_button.config(state="disabled")
+                self.stop_stream_button.config(state="normal")
+                label = tk.Label(self.stream_frame, text="Your Stream", font=("Arial", 10), bg=self.main_color, fg=self.text_color)
+                label.pack()
+                self.own_stream_label = tk.Label(self.stream_frame)
+                self.own_stream_label.pack()
+                self.video_labels[self.user_id] = self.own_stream_label
+            else:
+                self.start_stream_button.config(state="normal")
+                self.stop_stream_button.config(state="disabled")
 
         self.stream_frame = tk.Frame(chat_left_frame, bg=self.main_color)
         self.stream_frame.pack(fill="both", expand=True)
@@ -716,6 +769,7 @@ class AfterLoginUI:
 
         if self.user_id in all_members:
             self.fetch_messages(channel_id)
+            self.fetch_active_streams(channel_id)
 
     def display_message(self, username, timestamp, message):
         message_id = f"{self.selected_channel_id}:{username}:{timestamp}:{message}"
@@ -901,30 +955,55 @@ class AfterLoginUI:
     def on_stream_ended(self, streamer_id):
         print(f"[AfterLoginUI] on_stream_ended called for streamer {streamer_id}, current video_labels: {list(self.video_labels.keys())}")
         if streamer_id in self.video_labels:
-            self.video_labels[streamer_id].destroy()
+            video_label = self.video_labels[streamer_id]
+            # Remove the stream title label (e.g., "Your Stream" or "<username>'s Stream")
+            parent = video_label.master
+            for widget in parent.winfo_children():
+                if widget != video_label and isinstance(widget, tk.Label) and widget.cget("text") in [f"{self.get_username(streamer_id)}'s Stream", "Your Stream"]:
+                    widget.destroy()
+            video_label.destroy()
             del self.video_labels[streamer_id]
             print(f"[AfterLoginUI] Stream ended for {streamer_id}, removed video display")
         else:
             print(f"[AfterLoginUI] Stream ended for {streamer_id}, but no video label found")
+        if streamer_id == self.user_id:
+            self.own_stream_label = None
 
     def close(self):
         print(f"[AfterLoginUI] Closing UI for {self.identifier} (ID: {self.user_id})")
         self.running = False
 
-        # Stop any active streams
+        # Stop any active stream if the user is streaming
+        if self.is_streaming:
+            try:
+                self.stream.stop()
+                print(f"[AfterLoginUI] Stopped streaming for {self.identifier} (ID: {self.user_id}) on logout")
+            except Exception as e:
+                print(f"[AfterLoginUI] Error stopping stream on logout: {e}")
+
+        # Stop receiving streams from other users
+        for streamer_id in list(self.video_labels.keys()):
+            try:
+                self.stream.stop_receiving(streamer_id)
+                print(f"[AfterLoginUI] Stopped receiving stream from {streamer_id} on logout")
+            except Exception as e:
+                print(f"[AfterLoginUI] Error stopping stream reception from {streamer_id} on logout: {e}")
+
+        # Clean up P2PStream
         try:
             if self.stream:
                 print(f"[AfterLoginUI] Closing P2PStream for {self.identifier} (ID: {self.user_id})")
                 self.stream.close()
         except Exception as e:
-            print(f"[AfterLoginUI] Error stopping streams on logout: {e}")
+            print(f"[AfterLoginUI] Error closing P2PStream on logout: {e}")
 
-        # Send SET_STATUS Offline
-        try:
-            self.conn.sendall(f"SET_STATUS Offline {self.user_id}".encode())
-            print(f"[AfterLoginUI] Sent SET_STATUS Offline for {self.identifier} (ID: {self.user_id}) on logout")
-        except Exception as e:
-            print(f"[AfterLoginUI] Error sending SET_STATUS Offline: {e}")
+        # Send SET_STATUS Offline (respecting Invisible status)
+        if self.mode == "authenticated" and self.status != "Invisible":
+            try:
+                self.conn.sendall(f"SET_STATUS {self.user_id} Offline".encode())
+                print(f"[AfterLoginUI] Sent SET_STATUS Offline for {self.identifier} (ID: {self.user_id}) on logout")
+            except Exception as e:
+                print(f"[AfterLoginUI] Error sending SET_STATUS Offline: {e}")
 
         # Wait for threads to exit
         try:
