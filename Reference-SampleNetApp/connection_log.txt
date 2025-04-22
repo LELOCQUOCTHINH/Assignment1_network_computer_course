@@ -27,3 +27,141 @@
 [2025-04-22 12:45:09] CONNECTION_CLOSED | Source: Centralized Server | Details: Client anonymous (ID: v15) disconnected from ('192.168.1.11', 54965)
 [2025-04-22 12:45:11] STREAM_STOP | Source: Centralized Server | Details: User 2 stopped streaming in channel 1
 [2025-04-22 12:45:12] CONNECTION_CLOSED | Source: Centralized Server | Details: Client TTT (ID: 2) disconnected from ('192.168.1.11', 54962)
+[2025-04-22 14:08:28] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 55768)
+[2025-04-22 14:08:28] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 55769)
+[2025-04-22 14:08:28] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 55770)
+[2025-04-22 14:08:28] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 55771)
+[2025-04-22 14:21:44] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT: UPDATE_CHANNELS 4 MyChatRoom 1
+[2025-04-22 14:21:55] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT: UPDATE_CHANNELS 3 test3 2
+[2025-04-22 14:23:53] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT: UPDATE_CHANNELS 3 test3 2
+[2025-04-22 14:24:02] CONNECTION_CLOSED | Source: Centralized Server | Details: Client LLQT (ID: 1) disconnected from ('192.168.1.11', 55771)
+[2025-04-22 14:30:44] STREAM_START | Source: Centralized Server | Details: User 1 started streaming in channel 4 at 192.168.1.11:55958
+[2025-04-22 14:38:05] STREAM_STOP | Source: Centralized Server | Details: User 1 stopped streaming in channel 4
+[2025-04-22 14:38:06] CONNECTION_CLOSED | Source: Centralized Server | Details: Client LLQT (ID: 1) disconnected from ('192.168.1.11', 55768)
+[2025-04-22 14:38:30] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56021)
+[2025-04-22 14:38:30] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56020)
+[2025-04-22 14:38:30] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56022)
+[2025-04-22 14:38:30] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56023)
+[2025-04-22 14:38:43] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT: UPDATE_CHANNELS 3 test3 2
+[2025-04-22 14:38:57] CONNECTION_CLOSED | Source: Centralized Server | Details: Client LLQT (ID: 1) disconnected from ('192.168.1.11', 56023)
+[2025-04-22 14:41:46] CONNECTION_CLOSED | Source: Centralized Server | Details: Client anonymous (ID: v16) disconnected from ('192.168.1.11', 56022)
+[2025-04-22 14:41:55] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56057)
+[2025-04-22 14:41:55] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56056)
+[2025-04-22 14:41:55] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56058)
+[2025-04-22 14:41:55] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56059)
+[2025-04-22 14:42:09] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to anonymous: UPDATE_CHANNELS 4 MyChatRoom 1
+[2025-04-22 14:42:44] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to anonymous: UPDATE_CHANNELS 3 test3 2
+[2025-04-22 14:42:44] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT: UPDATE_CHANNELS 3 test3 2
+[2025-04-22 14:42:47] STREAM_START | Source: Centralized Server | Details: User 1 started streaming in channel 3 at 192.168.1.11:56069
+[2025-04-22 14:42:58] STREAM_STOP | Source: Centralized Server | Details: User 1 stopped streaming in channel 3
+[2025-04-22 14:42:59] CONNECTION_CLOSED | Source: Centralized Server | Details: Client LLQT (ID: 1) disconnected from ('192.168.1.11', 56058)
+[2025-04-22 14:43:10] STREAM_START | Source: Centralized Server | Details: User 1 started streaming in channel 3 at 192.168.1.11:56070
+[2025-04-22 14:43:18] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to anonymous: UPDATE_CHANNELS 3 test3 2
+[2025-04-22 14:43:18] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT: UPDATE_CHANNELS 3 test3 2
+[2025-04-22 14:43:26] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT: UPDATE_CHANNELS 3 test3 2
+[2025-04-22 14:43:26] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT: UPDATE_CHANNELS 4 MyChatRoom 1
+[2025-04-22 14:43:26] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT: STATUS v17 Offline
+[2025-04-22 14:43:26] CONNECTION_CLOSED | Source: Centralized Server | Details: Client anonymous (ID: v17) disconnected from ('192.168.1.11', 56059)
+[2025-04-22 14:43:27] STREAM_STOP | Source: Centralized Server | Details: User 1 stopped streaming in channel 3
+[2025-04-22 14:43:29] CONNECTION_CLOSED | Source: Centralized Server | Details: Client LLQT (ID: 1) disconnected from ('192.168.1.11', 56056)
+[2025-04-22 14:43:38] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56078)
+[2025-04-22 14:43:38] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56076)
+[2025-04-22 14:43:38] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56077)
+[2025-04-22 14:43:38] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56079)
+[2025-04-22 14:43:53] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT: UPDATE_CHANNELS 3 test3 2
+[2025-04-22 14:43:56] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT: UPDATE_CHANNELS 3 test3 2
+[2025-04-22 14:43:59] STREAM_START | Source: Centralized Server | Details: User 1 started streaming in channel 3 at 192.168.1.11:56086
+[2025-04-22 14:44:15] STREAM_STOP | Source: Centralized Server | Details: User 1 stopped streaming in channel 3
+[2025-04-22 14:44:15] CONNECTION_CLOSED | Source: Centralized Server | Details: Client LLQT (ID: 1) disconnected from ('192.168.1.11', 56077)
+[2025-04-22 14:53:29] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56142)
+[2025-04-22 14:53:29] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56143)
+[2025-04-22 14:53:29] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56144)
+[2025-04-22 14:53:29] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56145)
+[2025-04-22 14:53:45] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT: UPDATE_CHANNELS 3 test3 2
+[2025-04-22 14:53:52] CONNECTION_CLOSED | Source: Centralized Server | Details: Client LLQT (ID: 1) disconnected from ('192.168.1.11', 56143)
+[2025-04-22 14:56:46] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56175)
+[2025-04-22 14:56:46] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56176)
+[2025-04-22 14:56:46] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56177)
+[2025-04-22 14:56:46] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56178)
+[2025-04-22 14:56:59] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT: UPDATE_CHANNELS 3 test3 2
+[2025-04-22 14:57:02] STREAM_START | Source: Centralized Server | Details: User 1 started streaming in channel 3 at 192.168.1.11:56181
+[2025-04-22 14:57:20] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT: STATUS v18 Online
+[2025-04-22 14:57:26] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT: UPDATE_CHANNELS 3 test3 2
+[2025-04-22 14:57:26] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to anonymous: UPDATE_CHANNELS 3 test3 2
+[2025-04-22 14:57:42] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT: UPDATE_CHANNELS 3 test3 2
+[2025-04-22 14:57:42] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to anonymous: UPDATE_CHANNELS 3 test3 2
+[2025-04-22 14:57:42] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT: STATUS v18 Offline
+[2025-04-22 14:57:42] CONNECTION_CLOSED | Source: Centralized Server | Details: Client anonymous (ID: v18) disconnected from ('192.168.1.11', 56178)
+[2025-04-22 14:58:08] STREAM_STOP | Source: Centralized Server | Details: User 1 stopped streaming in channel 3
+[2025-04-22 14:58:08] CONNECTION_CLOSED | Source: Centralized Server | Details: Client LLQT (ID: 1) disconnected from ('192.168.1.11', 56177)
+[2025-04-22 14:58:51] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56196)
+[2025-04-22 14:58:51] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56197)
+[2025-04-22 14:58:51] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56198)
+[2025-04-22 14:58:51] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56199)
+[2025-04-22 14:59:03] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT: UPDATE_CHANNELS 3 test3 2
+[2025-04-22 14:59:07] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT: UPDATE_CHANNELS 3 test3 2
+[2025-04-22 14:59:17] CONNECTION_CLOSED | Source: Centralized Server | Details: Client LLQT (ID: 1) disconnected from ('192.168.1.11', 56199)
+[2025-04-22 14:59:38] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to anonymous: UPDATE_CHANNELS 4 MyChatRoom 1
+[2025-04-22 14:59:46] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to anonymous: STATUS 2 Online
+[2025-04-22 14:59:52] STREAM_START | Source: Centralized Server | Details: User 2 started streaming in channel 1 at 192.168.1.11:56203
+[2025-04-22 15:00:18] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to anonymous: UPDATE_CHANNELS 1 test 1
+[2025-04-22 15:00:18] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to TTT: UPDATE_CHANNELS 1 test 1
+[2025-04-22 15:01:35] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to anonymous: UPDATE_CHANNELS 1 test 1
+[2025-04-22 15:01:35] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to TTT: UPDATE_CHANNELS 1 test 1
+[2025-04-22 15:01:35] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to TTT: UPDATE_CHANNELS 4 MyChatRoom 1
+[2025-04-22 15:01:35] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to TTT: STATUS v19 Offline
+[2025-04-22 15:01:35] CONNECTION_CLOSED | Source: Centralized Server | Details: Client anonymous (ID: v19) disconnected from ('192.168.1.11', 56198)
+[2025-04-22 15:01:46] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to TTT: STATUS v20 Online
+[2025-04-22 15:01:52] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to TTT: UPDATE_CHANNELS 1 test 1
+[2025-04-22 15:01:52] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to anonymous: UPDATE_CHANNELS 1 test 1
+[2025-04-22 15:02:12] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to TTT: UPDATE_CHANNELS 1 test 1
+[2025-04-22 15:02:12] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to anonymous: UPDATE_CHANNELS 1 test 1
+[2025-04-22 15:02:12] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to TTT: STATUS v20 Offline
+[2025-04-22 15:02:12] CONNECTION_CLOSED | Source: Centralized Server | Details: Client anonymous (ID: v20) disconnected from ('192.168.1.11', 56196)
+[2025-04-22 15:02:36] STREAM_STOP | Source: Centralized Server | Details: User 2 stopped streaming in channel 1
+[2025-04-22 15:02:37] CONNECTION_CLOSED | Source: Centralized Server | Details: Client TTT (ID: 2) disconnected from ('192.168.1.11', 56197)
+[2025-04-22 15:03:31] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56258)
+[2025-04-22 15:03:31] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56259)
+[2025-04-22 15:03:31] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56260)
+[2025-04-22 15:03:31] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56261)
+[2025-04-22 15:03:42] STREAM_START | Source: Centralized Server | Details: User 1 started streaming in channel 2 at 192.168.1.11:56263
+[2025-04-22 15:03:49] STREAM_STOP | Source: Centralized Server | Details: User 1 stopped streaming in channel 2
+[2025-04-22 15:03:53] CONNECTION_CLOSED | Source: Centralized Server | Details: Client LLQT (ID: 1) disconnected from ('192.168.1.11', 56260)
+[2025-04-22 15:05:21] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56283)
+[2025-04-22 15:05:21] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56284)
+[2025-04-22 15:05:21] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56285)
+[2025-04-22 15:05:21] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56286)
+[2025-04-22 15:05:31] STREAM_START | Source: Centralized Server | Details: User 1 started streaming in channel 2 at 192.168.1.11:56288
+[2025-04-22 15:05:38] STREAM_STOP | Source: Centralized Server | Details: User 1 stopped streaming in channel 2
+[2025-04-22 15:05:39] CONNECTION_CLOSED | Source: Centralized Server | Details: Client LLQT (ID: 1) disconnected from ('192.168.1.11', 56285)
+[2025-04-22 15:05:54] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56294)
+[2025-04-22 15:05:54] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56295)
+[2025-04-22 15:05:54] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56296)
+[2025-04-22 15:05:54] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56297)
+[2025-04-22 15:06:04] STREAM_START | Source: Centralized Server | Details: User 1 started streaming in channel 2 at 192.168.1.11:56299
+[2025-04-22 15:06:10] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT: UPDATE_CHANNELS 2 test2 2
+[2025-04-22 15:06:14] STREAM_STOP | Source: Centralized Server | Details: User 1 stopped streaming in channel 2
+[2025-04-22 15:06:15] CONNECTION_CLOSED | Source: Centralized Server | Details: Client LLQT (ID: 1) disconnected from ('192.168.1.11', 56297)
+[2025-04-22 15:06:26] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to TTT: UPDATE_CHANNELS 4 MyChatRoom 1
+[2025-04-22 15:06:34] STREAM_START | Source: Centralized Server | Details: User 2 started streaming in channel 4 at 192.168.1.11:56300
+[2025-04-22 15:06:51] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to TTT: UPDATE_CHANNELS 4 MyChatRoom 1
+[2025-04-22 15:06:52] STREAM_STOP | Source: Centralized Server | Details: User 2 stopped streaming in channel 4
+[2025-04-22 15:06:53] CONNECTION_CLOSED | Source: Centralized Server | Details: Client TTT (ID: 2) disconnected from ('192.168.1.11', 56296)
+[2025-04-22 15:07:38] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56314)
+[2025-04-22 15:07:38] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56315)
+[2025-04-22 15:07:38] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56316)
+[2025-04-22 15:07:38] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.1.11', 56317)
+[2025-04-22 15:08:02] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT: STATUS v21 Online
+[2025-04-22 15:11:47] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT: UPDATE_CHANNELS 2 test2 2
+[2025-04-22 15:11:47] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to anonymous: UPDATE_CHANNELS 2 test2 2
+[2025-04-22 15:11:51] STREAM_START | Source: Centralized Server | Details: User 1 started streaming in channel 4 at 192.168.1.11:56352
+[2025-04-22 15:15:02] STREAM_STOP | Source: Centralized Server | Details: User 1 stopped streaming in channel 4
+[2025-04-22 15:15:03] CONNECTION_CLOSED | Source: Centralized Server | Details: Client LLQT (ID: 1) disconnected from ('192.168.1.11', 56317)
+[2025-04-22 15:15:31] MESSAGE_SENT | Source: Centralized Server | Details: User 1 sent message in channel 4: hello
+[2025-04-22 15:15:31] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT in channel 4: MESSAGE 4 1 2025-04-22T15:15:31 | hello
+[2025-04-22 15:15:31] STREAM_START | Source: Centralized Server | Details: User 1 started streaming in channel 4 at 192.168.1.11:56374
+[2025-04-22 15:15:38] MESSAGE_SENT | Source: Channel Hosting (Streamer ID: 1) | Details: User 1 sent message in channel 4: hi
+[2025-04-22 15:15:38] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT in channel 4: MESSAGE 4 1 2025-04-22T15:15:38 | hi
+[2025-04-22 15:20:15] STREAM_STOP | Source: Centralized Server | Details: User 1 stopped streaming in channel 4
+[2025-04-22 15:20:16] CONNECTION_CLOSED | Source: Centralized Server | Details: Client LLQT (ID: 1) disconnected from ('192.168.1.11', 56315)
+[2025-04-22 15:20:19] CONNECTION_CLOSED | Source: Centralized Server | Details: Client anonymous (ID: v21) disconnected from ('192.168.1.11', 56316)

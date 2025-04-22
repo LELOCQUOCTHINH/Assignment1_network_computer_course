@@ -785,6 +785,12 @@ class AfterLoginUI:
         if self.mode == "visitor":
             self.message_entry.config(state="disabled")
             send_btn.config(state="disabled")
+            if self.stream_toggle_button:  # Ensure the button exists before disabling
+                self.stream_toggle_button.config(state="disabled")
+
+        if self.mode == "visitor":
+            self.message_entry.config(state="disabled")
+            send_btn.config(state="disabled")
 
         self.stream_frame = tk.Frame(self.chat_left_frame, bg=self.main_color)
         self.stream_frame.pack(fill="both", expand=True)
@@ -794,8 +800,6 @@ class AfterLoginUI:
         self.member_frame = tk.Frame(self.chat_main_frame, bg=self.main_color, width=150)
         self.member_frame.pack(side="right", fill="y")
         self.member_frame.pack_propagate(False)
-
-        self.update_member_list(channel_id)
 
         all_members = channel["regular_members"] + channel["visitors"]
         is_host = channel["host"] == self.user_id
@@ -807,10 +811,15 @@ class AfterLoginUI:
                 join_btn = tk.Button(self.chat_left_frame, text="Join this channel", command=lambda: self.join_channel(channel_id),
                                      bg=self.join_btn_color, fg="white", font=("Arial", 10))
                 join_btn.pack(pady=5)
+                self.message_entry.config(state="disabled")
+                send_btn.config(state="disabled")
+                if self.stream_toggle_button:  # Ensure the button exists before disabling
+                    self.stream_toggle_button.config(state="disabled")
 
         if self.user_id in all_members:
             self.fetch_messages(channel_id)
             self.fetch_active_streams(channel_id)
+            self.update_member_list(channel_id)
 
     def display_message(self, username, timestamp, message):
         message_id = f"{self.selected_channel_id}:{username}:{timestamp}:{message}"
