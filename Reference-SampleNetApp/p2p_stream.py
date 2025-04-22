@@ -114,14 +114,21 @@ class P2PStream:
                             client.sendall(struct.pack('!I', frame_size))
                             client.sendall(frame_data)
                             logging.debug(f"[P2PStream] Sent frame of size {frame_size} to client")
-                        except Exception as e:
-                            logging.error(f"[P2PStream] Error sending frame to client: {e}")
+                        except socket.error as e:
+                            if e.errno == 10053:  # WSAECONNABORTED (Windows-specific error for aborted connection)
+                                logging.info(f"[P2PStream] Client disconnected (WSAECONNABORTED), removing client")
+                            else:
+                                logging.error(f"[P2PStream] Error sending frame to client: {e}")
                             clients_to_remove.append(client)
-                            client.close()
+                            try:
+                                client.close()
+                            except:
+                                pass
 
                     for client in clients_to_remove:
                         if client in self.clients:
                             self.clients.remove(client)
+                            logging.info(f"[P2PStream] Removed disconnected client from stream")
 
                 time.sleep(0.033)
 
@@ -286,36 +293,45 @@ class P2PStream:
                         logging.info(f"[P2PStream] Socket for {streamer_id} closed, exiting receive loop")
                         break
 
-                logging.debug(f"[P2PStream] Waiting to receive frame size from {streamer_id}")
-                size_data = client_socket.recv(4)
-                if len(size_data) != 4:
-                    logging.error(f"[P2PStream] Incomplete frame size received from {streamer_id}: {len(size_data)} bytes")
-                    break
-                frame_size = struct.unpack('!I', size_data)[0]
-                logging.debug(f"[P2PStream] Received frame size {frame_size} from {streamer_id}")
-
-                frame_data = b""
-                remaining = frame_size
-                while remaining > 0:
-                    chunk = client_socket.recv(min(remaining, 4096))
-                    if not chunk:
-                        logging.error(f"[P2PStream] Connection closed while receiving frame from {streamer_id}")
+                try:
+                    logging.debug(f"[P2PStream] Waiting to receive frame size from {streamer_id}")
+                    size_data = client_socket.recv(4)
+                    if len(size_data) != 4:
+                        logging.error(f"[P2PStream] Incomplete frame size received from {streamer_id}: {len(size_data)} bytes")
                         break
-                    frame_data += chunk
-                    remaining -= len(chunk)
-                if len(frame_data) != frame_size:
-                    logging.error(f"[P2PStream] Incomplete frame data received from {streamer_id}: {len(frame_data)}/{frame_size} bytes")
-                    break
+                    frame_size = struct.unpack('!I', size_data)[0]
+                    logging.debug(f"[P2PStream] Received frame size {frame_size} from {streamer_id}")
 
-                frame_array = np.frombuffer(frame_data, dtype=np.uint8)
-                frame = cv2.imdecode(frame_array, cv2.IMREAD_COLOR)
-                if frame is None:
-                    logging.error(f"[P2PStream] Failed to decode frame from {streamer_id}")
-                    continue
+                    frame_data = b""
+                    remaining = frame_size
+                    while remaining > 0:
+                        chunk = client_socket.recv(min(remaining, 4096))
+                        if not chunk:
+                            logging.error(f"[P2PStream] Connection closed while receiving frame from {streamer_id}")
+                            break
+                        frame_data += chunk
+                        remaining -= len(chunk)
+                    if len(frame_data) != frame_size:
+                        logging.error(f"[P2PStream] Incomplete frame data received from {streamer_id}: {len(frame_data)}/{frame_size} bytes")
+                        break
 
-                logging.debug(f"[P2PStream] Successfully decoded frame from {streamer_id}, shape: {frame.shape}")
-                if self.on_frame:
-                    self.on_frame(streamer_id, frame)
+                    frame_array = np.frombuffer(frame_data, dtype=np.uint8)
+                    frame = cv2.imdecode(frame_array, cv2.IMREAD_COLOR)
+                    if frame is None:
+                        logging.error(f"[P2PStream] Failed to decode frame from {streamer_id}")
+                        continue
+
+                    logging.debug(f"[P2PStream] Successfully decoded frame from {streamer_id}, shape: {frame.shape}")
+                    if self.on_frame:
+                        self.on_frame(streamer_id, frame)
+
+                except socket.error as e:
+                    if e.errno == 10038:  # WSAENOTSOCK (Windows-specific error for operations on a closed socket)
+                        logging.info(f"[P2PStream] Socket for {streamer_id} was closed (WSAENOTSOCK), exiting receive loop")
+                        break
+                    else:
+                        logging.error(f"[P2PStream] Socket error receiving stream from {streamer_id}: {e}")
+                        break
 
         except Exception as e:
             logging.error(f"[P2PStream] Error receiving stream from {streamer_id}: {e}")

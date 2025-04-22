@@ -126,7 +126,7 @@ class AfterLoginUI:
         self.welcome_label = tk.Label(self.content_frame, text=f"WELCOME, {self.identifier}!\nYou are logged in as {self.mode}.", font=("Arial", 16, "bold"), bg=self.main_color, fg=self.text_color)
         self.welcome_label.pack(pady=50)
 
-        self.chat_placeholder = tk.Label(self.content_frame, text="Chat features coming soon!", font=("Arial", 12), bg=self.main_color, fg=self.text_color)
+        self.chat_placeholder = tk.Label(self.content_frame, text="Select a channel to start chatting!", font=("Arial", 12), bg=self.main_color, fg=self.text_color)
         self.chat_placeholder.pack(pady=10)
 
         self.stream = P2PStream(
@@ -140,6 +140,7 @@ class AfterLoginUI:
         self.video_labels = {}
         self.video_frames = {}
         self.own_stream_label = None
+        self.stream_toggle_button = None  # Initialize the toggle button
 
         self.running = True
         self.listener_thread = threading.Thread(target=self.listen_for_updates, daemon=True)
@@ -470,16 +471,14 @@ class AfterLoginUI:
                         print(f"[AfterLoginUI] Stream started confirmation received for {self.identifier} (ID: {self.user_id})")
                         self.is_streaming = True
                         self.streaming_channel_id = self.selected_channel_id
-                        self.root.after(0, lambda: self.start_stream_button.config(state="disabled"))
-                        self.root.after(0, lambda: self.stop_stream_button.config(state="normal"))
+                        self.update_stream_toggle_button()  # Update the toggle button state
                         self.add_own_stream_ui()
 
                     elif command[0] == "STREAM_STOPPED":
                         print(f"[AfterLoginUI] Stream stopped confirmation received for {self.identifier} (ID: {self.user_id})")
                         self.is_streaming = False
                         self.streaming_channel_id = None
-                        self.root.after(0, lambda: self.start_stream_button.config(state="normal"))
-                        self.root.after(0, lambda: self.stop_stream_button.config(state="disabled"))
+                        self.update_stream_toggle_button()  # Update the toggle button state
                         self.on_stream_ended(self.user_id)
 
             except socket.error as e:
@@ -693,6 +692,22 @@ class AfterLoginUI:
                 leave_btn.bind("<Enter>", lambda e: leave_btn.config(bg=self.leave_btn_hover_color))
                 leave_btn.bind("<Leave>", lambda e: leave_btn.config(bg=self.leave_btn_color))
 
+    def update_stream_toggle_button(self):
+        if not self.stream_toggle_button:
+            return
+        if self.is_streaming and self.streaming_channel_id == self.selected_channel_id:
+            self.stream_toggle_button.config(
+                text="Stop Streaming",
+                command=self.stop_streaming,
+                bg=self.leave_btn_color
+            )
+        else:
+            self.stream_toggle_button.config(
+                text="Start Streaming",
+                command=self.start_streaming,
+                bg=self.create_btn_color
+            )
+
     def select_channel(self, channel_id):
         print(f"[AfterLoginUI] Selecting channel {channel_id} for {self.identifier} (ID: {self.user_id})")
 
@@ -755,21 +770,21 @@ class AfterLoginUI:
         send_btn = tk.Button(input_frame, text="Send", command=self.send_message, bg=self.send_btn_color, fg="white", font=("Arial", 10))
         send_btn.pack(side="left")
 
+        if self.mode == "authenticated":
+            # Create the toggle button for streaming
+            self.stream_toggle_button = tk.Button(
+                input_frame,
+                text="Start Streaming" if not (self.is_streaming and self.streaming_channel_id == self.selected_channel_id) else "Stop Streaming",
+                command=self.start_streaming if not (self.is_streaming and self.streaming_channel_id == self.selected_channel_id) else self.stop_streaming,
+                bg=self.create_btn_color if not (self.is_streaming and self.streaming_channel_id == self.selected_channel_id) else self.leave_btn_color,
+                fg="white",
+                font=("Arial", 10)
+            )
+            self.stream_toggle_button.pack(side="left", padx=(5, 0))
+
         if self.mode == "visitor":
             self.message_entry.config(state="disabled")
             send_btn.config(state="disabled")
-
-        if self.mode == "authenticated":
-            self.start_stream_button = tk.Button(self.chat_left_frame, text="Start Streaming", command=self.start_streaming, bg=self.create_btn_color, fg="white", font=("Arial", 10))
-            self.start_stream_button.pack(pady=5)
-            self.stop_stream_button = tk.Button(self.chat_left_frame, text="Stop Streaming", command=self.stop_streaming, bg=self.leave_btn_color, fg="white", font=("Arial", 10))
-            self.stop_stream_button.pack(pady=5)
-            if self.is_streaming and self.streaming_channel_id == self.selected_channel_id:
-                self.start_stream_button.config(state="disabled")
-                self.stop_stream_button.config(state="normal")
-            else:
-                self.start_stream_button.config(state="normal")
-                self.stop_stream_button.config(state="disabled")
 
         self.stream_frame = tk.Frame(self.chat_left_frame, bg=self.main_color)
         self.stream_frame.pack(fill="both", expand=True)
@@ -995,10 +1010,7 @@ class AfterLoginUI:
             self.own_stream_label = None
             self.is_streaming = False
             self.streaming_channel_id = None
-            if hasattr(self, 'start_stream_button') and self.start_stream_button.winfo_exists():
-                self.start_stream_button.config(state="normal")
-            if hasattr(self, 'stop_stream_button') and self.stop_stream_button.winfo_exists():
-                self.stop_stream_button.config(state="disabled")
+            self.update_stream_toggle_button()  # Update the toggle button state
 
     def close(self):
         print(f"[AfterLoginUI] Closing UI for {self.identifier} (ID: {self.user_id})")
