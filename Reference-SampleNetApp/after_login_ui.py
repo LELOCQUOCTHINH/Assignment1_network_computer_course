@@ -30,7 +30,7 @@ class AfterLoginUI:
         self.joined_channels = set()
         self.response_queue = queue.Queue()
         self.status_response_queue = queue.Queue()
-        self.last_status_change = time.time()  # Initialize to current time
+        self.last_status_change = time.time()
         self.status_debounce_delay = 0.5
 
         # Track streaming state
@@ -139,8 +139,9 @@ class AfterLoginUI:
 
         self.video_labels = {}
         self.video_frames = {}
+        self.own_stream_frame = None  # Persistent frame for own stream
         self.own_stream_label = None
-        self.stream_toggle_button = None  # Initialize the toggle button
+        self.stream_toggle_button = None
 
         self.running = True
         self.listener_thread = threading.Thread(target=self.listen_for_updates, daemon=True)
@@ -471,15 +472,15 @@ class AfterLoginUI:
                         print(f"[AfterLoginUI] Stream started confirmation received for {self.identifier} (ID: {self.user_id})")
                         self.is_streaming = True
                         self.streaming_channel_id = self.selected_channel_id
-                        self.update_stream_toggle_button()  # Update the toggle button state
-                        self.add_own_stream_ui()
+                        self.update_stream_toggle_button()
+                        self.setup_own_stream_ui()
 
                     elif command[0] == "STREAM_STOPPED":
                         print(f"[AfterLoginUI] Stream stopped confirmation received for {self.identifier} (ID: {self.user_id})")
                         self.is_streaming = False
                         self.streaming_channel_id = None
-                        self.update_stream_toggle_button()  # Update the toggle button state
-                        self.on_stream_ended(self.user_id)
+                        self.update_stream_toggle_button()
+                        self.cleanup_own_stream_ui()
 
             except socket.error as e:
                 if e.errno == errno.EWOULDBLOCK:
@@ -609,14 +610,27 @@ class AfterLoginUI:
 
         self.root.update()
 
-    def add_own_stream_ui(self):
-        if self.is_streaming and self.streaming_channel_id == self.selected_channel_id:
-            label = tk.Label(self.stream_frame, text="Your Stream", font=("Arial", 10), bg=self.main_color, fg=self.text_color)
+    def setup_own_stream_ui(self):
+        if not self.is_streaming:
+            return
+        # Create a persistent frame for the user's own stream
+        if not self.own_stream_frame:
+            self.own_stream_frame = tk.Frame(self.content_frame, bg=self.main_color)
+            label = tk.Label(self.own_stream_frame, text="Your Stream", font=("Arial", 10), bg=self.main_color, fg=self.text_color)
             label.pack()
-            self.own_stream_label = tk.Label(self.stream_frame)
+            self.own_stream_label = tk.Label(self.own_stream_frame)
             self.own_stream_label.pack()
             self.video_labels[self.user_id] = self.own_stream_label
-            print(f"[AfterLoginUI] Added own stream UI for {self.identifier} (ID: {self.user_id}) in channel {self.selected_channel_id}")
+            print(f"[AfterLoginUI] Set up own stream UI for {self.identifier} (ID: {self.user_id}) in channel {self.streaming_channel_id}")
+        # Only pack the frame if the user is on the streaming channel
+        if self.streaming_channel_id == self.selected_channel_id:
+            self.own_stream_frame.pack(fill="both", expand=True)
+            print(f"[AfterLoginUI] Packed own stream UI for {self.identifier} (ID: {self.user_id}) in channel {self.selected_channel_id}")
+
+    def cleanup_own_stream_ui(self):
+        if self.own_stream_frame:
+            self.own_stream_frame.pack_forget()  # Hide the frame instead of destroying it
+            print(f"[AfterLoginUI] Hid own stream UI for {self.identifier} (ID: {self.user_id})")
 
     def update_member_list(self, channel_id):
         channel = self.channels.get(channel_id)
@@ -711,9 +725,11 @@ class AfterLoginUI:
     def select_channel(self, channel_id):
         print(f"[AfterLoginUI] Selecting channel {channel_id} for {self.identifier} (ID: {self.user_id})")
 
-        # Stop receiving streams from the previous channel
+        print(f"[AfterLoginUI] User is streaming: {self.is_streaming}, streaming channel: {self.streaming_channel_id}. Stream will continue as per requirement.")
+
+        # Stop receiving streams from others in the previous channel
         for streamer_id in list(self.video_labels.keys()):
-            if streamer_id != self.user_id:  # Don't stop own stream, as it's managed separately
+            if streamer_id != self.user_id: 
                 try:
                     self.stream.stop_receiving(streamer_id)
                     print(f"[AfterLoginUI] Stopped receiving stream from {streamer_id} before switching to channel {channel_id}")
@@ -731,8 +747,14 @@ class AfterLoginUI:
         self.displayed_messages.clear()
         print(f"[AfterLoginUI] Cleared displayed messages for channel {channel_id}")
 
+        # Hide the own stream UI if it exists
+        if self.own_stream_frame:
+            self.own_stream_frame.pack_forget()
+            print(f"[AfterLoginUI] Hid own stream UI while switching to channel {channel_id}")
+
         for widget in self.content_frame.winfo_children():
-            widget.destroy()
+            if widget != self.own_stream_frame:  # Preserve the own stream frame
+                widget.destroy()
 
         self.chat_main_frame = tk.Frame(self.content_frame, bg=self.main_color)
         self.chat_main_frame.pack(fill="both", expand=True)
@@ -771,7 +793,6 @@ class AfterLoginUI:
         send_btn.pack(side="left")
 
         if self.mode == "authenticated":
-            # Create the toggle button for streaming
             self.stream_toggle_button = tk.Button(
                 input_frame,
                 text="Start Streaming" if not (self.is_streaming and self.streaming_channel_id == self.selected_channel_id) else "Stop Streaming",
@@ -785,17 +806,14 @@ class AfterLoginUI:
         if self.mode == "visitor":
             self.message_entry.config(state="disabled")
             send_btn.config(state="disabled")
-            if self.stream_toggle_button:  # Ensure the button exists before disabling
+            if self.stream_toggle_button:
                 self.stream_toggle_button.config(state="disabled")
-
-        if self.mode == "visitor":
-            self.message_entry.config(state="disabled")
-            send_btn.config(state="disabled")
 
         self.stream_frame = tk.Frame(self.chat_left_frame, bg=self.main_color)
         self.stream_frame.pack(fill="both", expand=True)
 
-        self.add_own_stream_ui()
+        # Reattach the own stream UI if on the streaming channel
+        self.setup_own_stream_ui()
 
         self.member_frame = tk.Frame(self.chat_main_frame, bg=self.main_color, width=150)
         self.member_frame.pack(side="right", fill="y")
@@ -804,7 +822,7 @@ class AfterLoginUI:
         all_members = channel["regular_members"] + channel["visitors"]
         is_host = channel["host"] == self.user_id
         if self.user_id in all_members and not is_host:
-            pass  # Leave button is added in update_member_list
+            pass
         else:
             if not is_host:
                 tk.Label(self.chat_left_frame, text="You're not a member of this channel", font=("Arial", 12), bg=self.main_color, fg=self.text_color).pack(pady=10)
@@ -813,7 +831,7 @@ class AfterLoginUI:
                 join_btn.pack(pady=5)
                 self.message_entry.config(state="disabled")
                 send_btn.config(state="disabled")
-                if self.stream_toggle_button:  # Ensure the button exists before disabling
+                if self.stream_toggle_button:
                     self.stream_toggle_button.config(state="disabled")
 
         if self.user_id in all_members:
@@ -983,22 +1001,29 @@ class AfterLoginUI:
             messagebox.showerror("Error", f"Failed to stop stream: {e}")
 
     def on_frame(self, streamer_id, frame):
-        try:
-            # print(f"[AfterLoginUI] Received frame from {streamer_id}, shape: {frame.shape}")
-            if streamer_id not in self.video_labels:
-                print(f"[AfterLoginUI] No video label for {streamer_id}, stream may have ended")
-                return
+        # Only process frames for the user's own stream if they are on the streaming channel
+        if streamer_id == self.user_id and self.streaming_channel_id != self.selected_channel_id:
+            return  # Skip frame updates if not on the streaming channel
 
+        if streamer_id not in self.video_labels:
+            return  # Skip if no video label exists
+
+        video_label = self.video_labels[streamer_id]
+        if not video_label.winfo_exists():
+            del self.video_labels[streamer_id]
+            if streamer_id == self.user_id:
+                self.own_stream_label = None
+            return
+
+        try:
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
             image = Image.fromarray(frame_rgb)
             image = image.resize((320, 240), Image.Resampling.LANCZOS)
             photo = ImageTk.PhotoImage(image)
 
-            video_label = self.video_labels[streamer_id]
             video_label.configure(image=photo)
             video_label.image = photo
             video_label.update()
-            # print(f"[AfterLoginUI] Updated video display for {streamer_id}, label visible: {video_label.winfo_exists()}")
         except Exception as e:
             print(f"[AfterLoginUI] Error displaying frame from {streamer_id}: {e}")
 
@@ -1013,31 +1038,26 @@ class AfterLoginUI:
             label.destroy()
             del self.video_labels[streamer_id]
             print(f"[AfterLoginUI] Stream ended for {streamer_id}, removed video display")
-        else:
-            print(f"[AfterLoginUI] Stream ended for {streamer_id}, but no video label found")
         if streamer_id == self.user_id:
             self.own_stream_label = None
             self.is_streaming = False
             self.streaming_channel_id = None
-            self.update_stream_toggle_button()  # Update the toggle button state
+            self.update_stream_toggle_button()
 
     def close(self):
         print(f"[AfterLoginUI] Closing UI for {self.identifier} (ID: {self.user_id})")
         self.running = False
 
-        # Prioritize stopping the stream to ensure it's stopped before any other cleanup
         if self.is_streaming:
             try:
                 self.stream.stop_streaming()
                 print(f"[AfterLoginUI] Successfully stopped streaming during close for {self.identifier} (ID: {self.user_id})")
-                # Ensure UI and state are updated
                 self.is_streaming = False
                 self.streaming_channel_id = None
-                self.on_stream_ended(self.user_id)
+                self.cleanup_own_stream_ui()
             except Exception as e:
                 print(f"[AfterLoginUI] Error stopping stream during close for {self.identifier} (ID: {self.user_id}): {e}")
 
-        # Stop receiving streams from others
         for streamer_id in list(self.video_labels.keys()):
             try:
                 self.stream.stop_receiving(streamer_id)
@@ -1045,7 +1065,6 @@ class AfterLoginUI:
             except Exception as e:
                 print(f"[AfterLoginUI] Error stopping stream reception from {streamer_id} during close: {e}")
 
-        # Close the P2PStream instance
         try:
             if self.stream:
                 print(f"[AfterLoginUI] Closing P2PStream for {self.identifier} (ID: {self.user_id})")
@@ -1053,7 +1072,6 @@ class AfterLoginUI:
         except Exception as e:
             print(f"[AfterLoginUI] Error closing P2PStream on logout: {e}")
 
-        # Update status to Offline if not Invisible (for authenticated users)
         if self.mode == "authenticated" and self.status != "Invisible":
             try:
                 self.conn.sendall(f"SET_STATUS {self.user_id} Offline".encode())
@@ -1061,7 +1079,6 @@ class AfterLoginUI:
             except Exception as e:
                 print(f"[AfterLoginUI] Error sending SET_STATUS Offline: {e}")
 
-        # Join listener threads
         try:
             if self.listener_thread and self.listener_thread.is_alive():
                 self.listener_thread.join(timeout=1.0)
@@ -1072,20 +1089,17 @@ class AfterLoginUI:
         except Exception as e:
             print(f"[AfterLoginUI] Error joining threads: {e}")
 
-        # Close the socket connection
         try:
             self.conn.close()
             print(f"[AfterLoginUI] Closed connection for {self.identifier} (ID: {self.user_id})")
         except Exception as e:
             print(f"[AfterLoginUI] Error closing connection: {e}")
 
-        # Destroy the UI
         try:
             self.root.destroy()
             print(f"[AfterLoginUI] UI destroyed for {self.identifier} (ID: {self.user_id})")
         except Exception as e:
             print(f"[AfterLoginUI] Error destroying UI: {e}")
 
-        # Log active threads for diagnostics
         active_threads = threading.enumerate()
         print(f"[AfterLoginUI] Active threads after close: {[t.name for t in active_threads]}")

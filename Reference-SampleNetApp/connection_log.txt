@@ -165,3 +165,132 @@
 [2025-04-22 15:20:15] STREAM_STOP | Source: Centralized Server | Details: User 1 stopped streaming in channel 4
 [2025-04-22 15:20:16] CONNECTION_CLOSED | Source: Centralized Server | Details: Client LLQT (ID: 1) disconnected from ('192.168.1.11', 56315)
 [2025-04-22 15:20:19] CONNECTION_CLOSED | Source: Centralized Server | Details: Client anonymous (ID: v21) disconnected from ('192.168.1.11', 56316)
+[2025-04-23 06:42:32] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 51950)
+[2025-04-23 06:42:32] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 51949)
+[2025-04-23 06:42:32] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 51951)
+[2025-04-23 06:42:32] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 51952)
+[2025-04-23 06:42:48] STREAM_START | Source: Centralized Server | Details: User 1 started streaming in channel 3 at 192.168.102.28:51954
+[2025-04-23 06:42:56] CONNECTION_CLOSED | Source: Centralized Server | Details: Client LLQT (ID: 1) disconnected from ('192.168.102.28', 51951)
+[2025-04-23 06:50:38] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 52028)
+[2025-04-23 06:50:38] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 52029)
+[2025-04-23 06:50:38] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 52030)
+[2025-04-23 06:50:38] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 52031)
+[2025-04-23 06:50:51] STREAM_START | Source: Centralized Server | Details: User 1 started streaming in channel 3 at 192.168.102.28:52033
+[2025-04-23 06:50:55] STREAM_STOP | Source: Centralized Server | Details: User 1 stopped streaming in channel 3
+[2025-04-23 06:51:07] CONNECTION_CLOSED | Source: Centralized Server | Details: Client LLQT (ID: 1) disconnected from ('192.168.102.28', 52031)
+[2025-04-23 06:55:15] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 52065)
+[2025-04-23 06:55:15] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 52064)
+[2025-04-23 06:55:15] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 52066)
+[2025-04-23 06:55:15] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 52067)
+[2025-04-23 06:55:27] STREAM_START | Source: Centralized Server | Details: User 1 started streaming in channel 3 at 192.168.102.28:52069
+[2025-04-23 06:55:32] STREAM_STOP | Source: Centralized Server | Details: User 1 stopped streaming in channel 3
+[2025-04-23 06:55:38] CONNECTION_CLOSED | Source: Centralized Server | Details: Client LLQT (ID: 1) disconnected from ('192.168.102.28', 52067)
+[2025-04-23 06:57:40] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 52090)
+[2025-04-23 06:57:40] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 52089)
+[2025-04-23 06:57:40] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 52091)
+[2025-04-23 06:57:40] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 52092)
+[2025-04-23 06:57:51] STREAM_START | Source: Centralized Server | Details: User 1 started streaming in channel 3 at 192.168.102.28:52094
+[2025-04-23 06:58:00] STREAM_STOP | Source: Centralized Server | Details: User 1 stopped streaming in channel 3
+[2025-04-23 06:58:00] CONNECTION_CLOSED | Source: Centralized Server | Details: Client LLQT (ID: 1) disconnected from ('192.168.102.28', 52092)
+[2025-04-23 07:11:52] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 52179)
+[2025-04-23 07:11:52] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 52180)
+[2025-04-23 07:11:52] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 52181)
+[2025-04-23 07:11:52] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 52182)
+[2025-04-23 07:12:05] STREAM_START | Source: Centralized Server | Details: User 1 started streaming in channel 4 at 192.168.102.28:52184
+[2025-04-23 07:12:29] CONNECTION_CLOSED | Source: Centralized Server | Details: Client LLQT (ID: 1) disconnected from ('192.168.102.28', 52182)
+[2025-04-23 07:17:00] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 52241)
+[2025-04-23 07:17:00] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 52242)
+[2025-04-23 07:17:00] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 52243)
+[2025-04-23 07:17:00] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 52244)
+[2025-04-23 07:17:10] STREAM_START | Source: Centralized Server | Details: User 1 started streaming in channel 3 at 192.168.102.28:52246
+[2025-04-23 07:17:21] CONNECTION_CLOSED | Source: Centralized Server | Details: Client LLQT (ID: 1) disconnected from ('192.168.102.28', 52244)
+[2025-04-23 07:17:39] STREAM_START | Source: Centralized Server | Details: User 2 started streaming in channel 1 at 192.168.102.28:52247
+[2025-04-23 07:17:52] CONNECTION_CLOSED | Source: Centralized Server | Details: Client TTT (ID: 2) disconnected from ('192.168.102.28', 52243)
+[2025-04-23 07:24:55] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 52290)
+[2025-04-23 07:24:55] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 52291)
+[2025-04-23 07:24:55] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 52292)
+[2025-04-23 07:24:55] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 52293)
+[2025-04-23 07:25:07] STREAM_START | Source: Centralized Server | Details: User 1 started streaming in channel 1 at 192.168.102.28:52299
+[2025-04-23 07:25:09] STREAM_STOP | Source: Centralized Server | Details: User 1 stopped streaming in channel 1
+[2025-04-23 07:25:21] CONNECTION_CLOSED | Source: Centralized Server | Details: Client LLQT (ID: 1) disconnected from ('192.168.102.28', 52292)
+[2025-04-23 07:41:22] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 52410)
+[2025-04-23 07:41:22] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 52411)
+[2025-04-23 07:41:22] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 52412)
+[2025-04-23 07:41:22] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 52413)
+[2025-04-23 07:41:40] STREAM_START | Source: Centralized Server | Details: User 1 started streaming in channel 1 at 192.168.102.28:52416
+[2025-04-23 07:42:07] CONNECTION_CLOSED | Source: Centralized Server | Details: Client LLQT (ID: 1) disconnected from ('192.168.102.28', 52413)
+[2025-04-23 07:49:51] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 52475)
+[2025-04-23 07:49:51] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 52476)
+[2025-04-23 07:49:51] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 52477)
+[2025-04-23 07:49:51] CONNECTION_ESTABLISHED | Source: Centralized Server | Details: Client connected from ('192.168.102.28', 52478)
+[2025-04-23 07:50:03] STREAM_START | Source: Centralized Server | Details: User 1 started streaming in channel 1 at 192.168.102.28:52480
+[2025-04-23 07:50:27] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT: STATUS 3 Online
+[2025-04-23 07:50:33] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT: UPDATE_CHANNELS 1 test 1
+[2025-04-23 07:50:33] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to nano: UPDATE_CHANNELS 1 test 1
+[2025-04-23 07:50:38] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT: UPDATE_CHANNELS 1 test 1
+[2025-04-23 07:50:38] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to nano: UPDATE_CHANNELS 1 test 1
+[2025-04-23 07:50:49] MESSAGE_SENT | Source: Centralized Server | Details: User 3 sent message in channel 1: hello
+[2025-04-23 07:50:49] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT in channel 1: MESSAGE 1 3 2025-04-23T07:50:49 | hello
+[2025-04-23 07:50:49] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to nano in channel 1: MESSAGE 1 3 2025-04-23T07:50:49 | hello
+[2025-04-23 07:50:54] MESSAGE_SENT | Source: Channel Hosting (Streamer ID: 1) | Details: User 1 sent message in channel 1: haha
+[2025-04-23 07:50:54] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT in channel 1: MESSAGE 1 1 2025-04-23T07:50:54 | haha
+[2025-04-23 07:50:54] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to nano in channel 1: MESSAGE 1 1 2025-04-23T07:50:54 | haha
+[2025-04-23 07:51:05] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT: STATUS v22 Online
+[2025-04-23 07:51:05] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to nano: STATUS v22 Online
+[2025-04-23 07:51:10] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT: UPDATE_CHANNELS 1 test 1
+[2025-04-23 07:51:10] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to nano: UPDATE_CHANNELS 1 test 1
+[2025-04-23 07:51:10] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to anonymous: UPDATE_CHANNELS 1 test 1
+[2025-04-23 07:51:28] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT: STATUS 3 Invisible
+[2025-04-23 07:51:28] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to anonymous: STATUS 3 Invisible
+[2025-04-23 07:52:34] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to nano in channel 1: LIVESTREAM_STOP 1 1
+[2025-04-23 07:52:34] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to anonymous in channel 1: LIVESTREAM_STOP 1 1
+[2025-04-23 07:52:34] STREAM_STOP | Source: Centralized Server | Details: User 1 stopped streaming in channel 1
+[2025-04-23 07:52:35] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to nano in channel 1: LIVESTREAM_START 1 1 192.168.102.28 52529
+[2025-04-23 07:52:35] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to anonymous in channel 1: LIVESTREAM_START 1 1 192.168.102.28 52529
+[2025-04-23 07:52:35] STREAM_START | Source: Centralized Server | Details: User 1 started streaming in channel 1 at 192.168.102.28:52529
+[2025-04-23 07:52:39] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to nano in channel 1: LIVESTREAM_STOP 1 1
+[2025-04-23 07:52:39] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to anonymous in channel 1: LIVESTREAM_STOP 1 1
+[2025-04-23 07:52:39] STREAM_STOP | Source: Centralized Server | Details: User 1 stopped streaming in channel 1
+[2025-04-23 07:52:41] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT in channel 1: LIVESTREAM_START 3 1 192.168.102.28 52532
+[2025-04-23 07:52:41] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to anonymous in channel 1: LIVESTREAM_START 3 1 192.168.102.28 52532
+[2025-04-23 07:52:41] STREAM_START | Source: Centralized Server | Details: User 3 started streaming in channel 1 at 192.168.102.28:52532
+[2025-04-23 07:52:51] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT in channel 1: LIVESTREAM_STOP 3 1
+[2025-04-23 07:52:51] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to anonymous in channel 1: LIVESTREAM_STOP 3 1
+[2025-04-23 07:52:51] STREAM_STOP | Source: Centralized Server | Details: User 3 stopped streaming in channel 1
+[2025-04-23 07:52:57] MESSAGE_SENT | Source: Centralized Server | Details: User 1 sent message in channel 1: haha
+[2025-04-23 07:52:57] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT in channel 1: MESSAGE 1 1 2025-04-23T07:52:57 | haha
+[2025-04-23 07:52:57] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to nano in channel 1: MESSAGE 1 1 2025-04-23T07:52:57 | haha
+[2025-04-23 07:52:57] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to anonymous in channel 1: MESSAGE 1 1 2025-04-23T07:52:57 | haha
+[2025-04-23 07:52:59] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT in channel 1: LIVESTREAM_START 3 1 192.168.102.28 52536
+[2025-04-23 07:52:59] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to anonymous in channel 1: LIVESTREAM_START 3 1 192.168.102.28 52536
+[2025-04-23 07:52:59] STREAM_START | Source: Centralized Server | Details: User 3 started streaming in channel 1 at 192.168.102.28:52536
+[2025-04-23 07:53:08] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT in channel 1: LIVESTREAM_STOP 3 1
+[2025-04-23 07:53:08] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to anonymous in channel 1: LIVESTREAM_STOP 3 1
+[2025-04-23 07:53:08] STREAM_STOP | Source: Centralized Server | Details: User 3 stopped streaming in channel 1
+[2025-04-23 07:53:11] CONNECTION_CLOSED | Source: Centralized Server | Details: Client nano (ID: 3) disconnected from ('192.168.102.28', 52477)
+[2025-04-23 07:53:22] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to anonymous in channel 1: LIVESTREAM_START 1 1 192.168.102.28 52547
+[2025-04-23 07:53:22] STREAM_START | Source: Centralized Server | Details: User 1 started streaming in channel 1 at 192.168.102.28:52547
+[2025-04-23 07:53:54] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to anonymous in channel 1: LIVESTREAM_STOP 1 1
+[2025-04-23 07:53:54] STREAM_STOP | Source: Centralized Server | Details: User 1 stopped streaming in channel 1
+[2025-04-23 07:54:04] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT: STATUS 2 Online
+[2025-04-23 07:54:04] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to anonymous: STATUS 2 Online
+[2025-04-23 07:54:11] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT in channel 1: LIVESTREAM_START 2 1 192.168.102.28 52550
+[2025-04-23 07:54:11] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to anonymous in channel 1: LIVESTREAM_START 2 1 192.168.102.28 52550
+[2025-04-23 07:54:11] STREAM_START | Source: Centralized Server | Details: User 2 started streaming in channel 1 at 192.168.102.28:52550
+[2025-04-23 07:54:15] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT: UPDATE_CHANNELS 1 test 1
+[2025-04-23 07:54:15] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to anonymous: UPDATE_CHANNELS 1 test 1
+[2025-04-23 07:54:15] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to TTT: UPDATE_CHANNELS 1 test 1
+[2025-04-23 07:54:21] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT: UPDATE_CHANNELS 1 test 1
+[2025-04-23 07:54:21] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to anonymous: UPDATE_CHANNELS 1 test 1
+[2025-04-23 07:54:21] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to TTT: UPDATE_CHANNELS 1 test 1
+[2025-04-23 07:54:29] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT in channel 1: LIVESTREAM_STOP 2 1
+[2025-04-23 07:54:29] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to anonymous in channel 1: LIVESTREAM_STOP 2 1
+[2025-04-23 07:54:29] STREAM_STOP | Source: Centralized Server | Details: User 2 stopped streaming in channel 1
+[2025-04-23 07:54:29] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT: STATUS 2 Offline
+[2025-04-23 07:54:29] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to anonymous: STATUS 2 Offline
+[2025-04-23 07:54:29] CONNECTION_CLOSED | Source: Centralized Server | Details: Client TTT (ID: 2) disconnected from ('192.168.102.28', 52475)
+[2025-04-23 07:54:33] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT: UPDATE_CHANNELS 1 test 1
+[2025-04-23 07:54:33] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to anonymous: UPDATE_CHANNELS 1 test 1
+[2025-04-23 07:54:33] NOTIFICATION_SENT | Source: Centralized Server | Details: Broadcasted message to LLQT: STATUS v22 Offline
+[2025-04-23 07:54:33] CONNECTION_CLOSED | Source: Centralized Server | Details: Client anonymous (ID: v22) disconnected from ('192.168.102.28', 52476)
+[2025-04-23 07:54:36] CONNECTION_CLOSED | Source: Centralized Server | Details: Client LLQT (ID: 1) disconnected from ('192.168.102.28', 52478)

@@ -1,1 +1,1 @@
-{"users": {"LLQT": {"password": "LLQT", "status": "Invisible", "user_id": "1"}, "TTT": {"password": "TTT", "status": "Offline", "user_id": "2"}, "nano": {"password": "nano", "status": "Online", "user_id": "3"}}, "next_user_id": 22}
+{"users": {"LLQT": {"password": "LLQT", "status": "Invisible", "user_id": "1"}, "TTT": {"password": "TTT", "status": "Offline", "user_id": "2"}, "nano": {"password": "nano", "status": "Invisible", "user_id": "3"}}, "next_user_id": 23}
